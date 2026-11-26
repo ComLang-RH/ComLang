@@ -1,0 +1,528 @@
+# -*- coding: utf-8 -*-
+"""FreeCAD macro: haptic palm-writing box v2 (prototype CAD), parametric.
+
+The hand lies PALM DOWN on the box top, in a shallow hand-shaped recess. Under the
+palm is a window; a pointed pen on a crossed-rail XY gantry inside the box rises
+through it and traces block capitals on the palm. Buttons sit by the thumb and the
+little finger, refreshable Braille cells under the index and middle fingertips.
+
+GUI:       freecad haptic_box_v2.FCMacro   (animates the gantry writing TEXT;
+           stop with stop_writer() in the Python console)
+Headless:  freecadcmd haptic_box_v2.FCMacro
+           -> clearance checks, saves haptic_box_v2.FCStd + haptic_box_v2.step
+           HAPTIC_DUMP=build/v2_mesh.json also writes meshes for render_views.py
+
+Frame: x across (+x = user's right), y away from the user (y=0 = front face),
+z up from the table. Units mm. Needs palm_writer.py in the same folder.
+"""
+import json, math, os, sys, time
+import FreeCAD as App
+import Part
+from FreeCAD import Vector, Placement, Rotation
+
+# ---------------- parameters ----------------
+HAND = "right"                 # "right" / "left": mirrors thumb side, buttons and Braille cells
+BOX_W, BOX_L, BOX_H = 260.0, 330.0, 72.0   # outside; BOX_H = top surface height
+WALL, FLOOR, TOP_T = 3.0, 3.0, 6.0         # top plate 6 mm (acrylic / HDPE / alu)
+CORNER_R = 12.0
+RECESS = 2.0                   # depth of the hand-shaped tactile recess
+WRIST_Y = 100.0                # wrist crease position on the top
+PALM_Y = WRIST_Y + 55.0        # centre of the writing area
+PALM_Z = BOX_H - RECESS        # palm skin height (rests on the recess floor)
+WINDOW, WINDOW_R = 84.0, 8.0   # opening under the palm (70 mm workspace + pen + margin)
+PEN_PRESS = 1.5                # how far the tip pushes above the recess floor (skin indentation)
+PEN_UP_GAP = 2.0               # retracted tip sits this far below the plate underside
+# gantry layout (crossed bars, two levels 14 mm apart = one writing plane)
+Z_YBAR, Z_XBAR = 34.0, 48.0    # bar that moves in y (runs along x) / bar that moves in x
+RAIL_X = 100.0                 # y-rails at x = +-RAIL_X
+RAIL_DY = 85.0                 # x-rails at y = PALM_Y +- RAIL_DY
+ROD_R, BORE_R = 4.0, 4.3
+Z_YDRIVE, Z_XDRIVE = 21.0, Z_XBAR
+BELT_X = 116.0                 # y-belts outboard of the y-rails
+XSYNC_X = -88.0                # x-drive sync shaft (along y)
+PULLEY_R = 6.0
+PEN_DX, PEN_DY = 16.0, 16.0    # pen sits diagonally off the carriage centre, clear of both bars
+TEXT = "HELLO"                 # GUI animation
+# --------------------------------------------
+
+try:
+    HERE = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    HERE = os.getcwd()
+sys.path.insert(0, HERE)
+import palm_writer as pw  # noqa: E402
+
+TS = -1.0 if HAND == "right" else 1.0   # thumb side: palm down, a right thumb points to -x
+PLATE_UNDER = BOX_H - TOP_T
+PEN_UP_TIP = PLATE_UNDER - PEN_UP_GAP
+PEN_DOWN_TIP = PALM_Z + PEN_PRESS
+NEMA14 = 35.0
+FINGERS = [("index", 30, 72), ("middle", 10, 80), ("ring", -10, 75), ("little", -30, 60)]
+FINGER_BASE_Y = WRIST_Y + 105
+THUMB_ROOT = (TS * 42, WRIST_Y + 35)
+THUMB_DIR = (TS * 0.6, 0.8)
+THUMB_LEN = 60.0
+
+
+def V(x, y, z=0.0):
+    return Vector(x, y, z)
+
+
+def rbox(w, l, h, r, x, y, z):
+    b = Part.makeBox(w, l, h, V(x, y, z))
+    if r <= 0:
+        return b
+    return b.makeFillet(r, [e for e in b.Edges if abs(e.tangentAt(0).z) > 0.99])
+
+
+def rod(r, p, d, length):
+    return Part.makeCylinder(r, length, V(*p), V(*d))
+
+
+def finger_x(fx):
+    return TS * fx                           # index (fx=30) is on the thumb side
+
+
+def pad_y(length):
+    return FINGER_BASE_Y + length - 12.0     # fingertip pad centre
+
+
+def thumb_box(width, extra, z0, h):
+    a = math.degrees(math.atan2(THUMB_DIR[0], THUMB_DIR[1]))
+    b = Part.makeBox(width, THUMB_LEN + extra, h, V(-width / 2, -5, z0))
+    b.rotate(V(0, 0, 0), V(0, 0, 1), -a)
+    b.translate(V(THUMB_ROOT[0], THUMB_ROOT[1], 0))
+    return b
+
+
+# ---------------- static parts ----------------
+def shell():
+    outer = rbox(BOX_W, BOX_L, PLATE_UNDER, CORNER_R, -BOX_W / 2, 0, 0)
+    inner = rbox(BOX_W - 2 * WALL, BOX_L - 2 * WALL, PLATE_UNDER, CORNER_R - WALL,
+                 -BOX_W / 2 + WALL, WALL, FLOOR)
+    s = outer.cut(inner)
+    for i in range(7):                                           # rear vents
+        s = s.cut(Part.makeBox(6, 3 * WALL, 22, V(-60 + 20 * i, BOX_L - 2 * WALL, 20)))
+    s = s.cut(rod(5, (95, BOX_L - 2 * WALL, 30), (0, 1, 0), 3 * WALL))   # USB-C / DC in
+    return s
+
+
+BUTTONS = {   # name: (x, y) on the top
+    "Pause": (TS * 104, WRIST_Y + 60),
+    "Repeat": (TS * 96, WRIST_Y + 112),
+    "Speed": (-TS * 72, WRIST_Y + 120),
+}
+WRIST_PAD = (0.0, WRIST_Y - 25)
+
+
+def top_plate():
+    p = rbox(BOX_W, BOX_L, TOP_T, CORNER_R, -BOX_W / 2, 0, PLATE_UNDER)
+    p = p.makeFillet(3, [e for e in p.Edges if e.BoundBox.ZMin > BOX_H - 0.01
+                         and abs(e.tangentAt(0).z) < 0.01])
+    z0, h = PALM_Z, RECESS + 1
+    pocket = rbox(100, 120, h, 15, -50, WRIST_Y - 8, z0)                   # palm
+    for _, fx, fl in FINGERS:
+        pocket = pocket.fuse(rbox(22, fl + 22, h, 10, finger_x(fx) - 11, FINGER_BASE_Y - 10, z0))
+    pocket = pocket.fuse(thumb_box(26, 20, z0, h))
+    p = p.cut(pocket.removeSplitter())
+    p = p.cut(rbox(WINDOW, WINDOW, TOP_T + 2, WINDOW_R, -WINDOW / 2, PALM_Y - WINDOW / 2,
+                   PLATE_UNDER - 1))
+    for x, y in BUTTONS.values():
+        p = p.cut(Part.makeCylinder(9.5, TOP_T + 2, V(x, y, PLATE_UNDER - 1)))
+    for (x, y), _ in braille_pins():
+        p = p.cut(Part.makeCylinder(0.8, TOP_T + 2, V(x, y, PLATE_UNDER - 1)))
+    for i in range(4):                                                    # mic grille
+        for j in range(4):
+            p = p.cut(Part.makeCylinder(1.2, TOP_T + 2, V(-TS * 80 + 5 * i, 290 + 5 * j, PLATE_UNDER - 1)))
+    p = p.cut(Part.makeCylinder(2.0, TOP_T + 2, V(-TS * 105, 300, PLATE_UNDER - 1)))   # LED
+    p = p.cut(Part.makeCylinder(12, 1, V(WRIST_PAD[0], WRIST_PAD[1], BOX_H - 0.4)))       # pad inlay
+    return p
+
+
+def wrist_pad():
+    """Flush capacitive 'hand present' pad (copper/brass disc inlaid 0.4 mm into the top)."""
+    x, y = WRIST_PAD
+    return Part.makeCylinder(12, 0.4, V(x, y, BOX_H - 0.4))
+
+
+BRAILLE_SHOW = {"index": (1, 2, 5), "middle": ()}         # letter H on the index cell
+
+
+def braille_pins():
+    """((x, y), raised) for the 6 pins of each cell, dots 1-3 left column top->bottom."""
+    out = []
+    for name, fx, fl in FINGERS[:2]:
+        cx, cy = finger_x(fx), pad_y(fl)
+        for d in range(1, 7):
+            col, row = (0 if d <= 3 else 1), (d - 1) % 3
+            # fingertip reads from above, as on paper: dots 1-3 on the left (-x), dot 1 furthest away
+            x = cx + (-1.25 if col == 0 else 1.25)
+            y = cy + (1 - row) * 2.5
+            out.append(((x, y), d in BRAILLE_SHOW[name]))
+    return out
+
+
+def braille_parts():
+    mods, pins = None, None
+    for name, fx, fl in FINGERS[:2]:
+        cx, cy = finger_x(fx), pad_y(fl)
+        m = Part.makeBox(12, 44, 16, V(cx - 6, cy - 8, PLATE_UNDER - 16))
+        mods = m if mods is None else mods.fuse(m)
+    for (x, y), up in braille_pins():
+        top = PALM_Z + (0.7 if up else 0.0)
+        c = Part.makeCylinder(0.7, top - PLATE_UNDER, V(x, y, PLATE_UNDER))
+        pins = c if pins is None else pins.fuse(c)
+    return mods, pins
+
+
+def button_parts():
+    caps, switches = [], None
+    braille_label = {"Pause": (1, 2, 3, 4), "Repeat": (1, 2, 3, 5), "Speed": (2, 3, 4)}  # P R S
+    for name, (x, y) in BUTTONS.items():
+        cap = Part.makeCylinder(9, 4.2, V(x, y, BOX_H))
+        cap = cap.makeFillet(1.5, [e for e in cap.Edges if e.BoundBox.ZMin > BOX_H + 4.1])
+        for d in braille_label[name]:
+            col, row = (0 if d <= 3 else 1), (d - 1) % 3
+            cap = cap.fuse(Part.makeSphere(0.7, V(x - 1.25 + 2.5 * col, y + 2.5 - 2.5 * row, BOX_H + 4.2)))
+        caps.append((name, cap.removeSplitter()))
+        sw = Part.makeBox(14, 14, 12, V(x - 7, y - 7, PLATE_UNDER - 12))
+        switches = sw if switches is None else switches.fuse(sw)
+    return caps, switches
+
+
+def rails():
+    s = None
+    for sx in (-1, 1):                                       # y-rails + pillars
+        x = sx * RAIL_X
+        parts = [rod(ROD_R, (x, PALM_Y - 79, Z_YBAR), (0, 1, 0), 158)]
+        for y in (PALM_Y - 75, PALM_Y + 75):
+            parts.append(Part.makeBox(12, 8, Z_YBAR + 6 - FLOOR, V(x - 6, y - 4, FLOOR)))
+        for q in parts:
+            s = q if s is None else s.fuse(q)
+    for sy in (-1, 1):                                       # x-rails + pillars
+        y = PALM_Y + sy * RAIL_DY
+        s = s.fuse(rod(ROD_R, (-80, y, Z_XBAR), (1, 0, 0), 160))
+        for x in (-76, 76):
+            s = s.fuse(Part.makeBox(8, 12, Z_XBAR + 6 - FLOOR, V(x - 4, y - 6, FLOOR)))
+    return s.removeSplitter()
+
+
+def drives():
+    """Belts, pulleys, sync shafts and two NEMA14 steppers (approximate envelopes)."""
+    belts, metal, motors = None, None, None
+
+    def add(acc, q):
+        return q if acc is None else acc.fuse(q)
+
+    y0, y1 = PALM_Y - 85, PALM_Y + 107                       # y-belt pulley centres
+    for sx in (-1, 1):
+        x = sx * BELT_X
+        for y in (y0, y1):
+            metal = add(metal, rod(PULLEY_R, (x - 4, y, Z_YDRIVE), (1, 0, 0), 8))
+        for dz in (-PULLEY_R, PULLEY_R):
+            belts = add(belts, Part.makeBox(6, y1 - y0, 1.5, V(x - 3, y0, Z_YDRIVE + dz - 0.75)))
+    metal = add(metal, rod(2.5, (-BELT_X - 4, y1, Z_YDRIVE), (1, 0, 0), 2 * BELT_X + 8))
+    motors = add(motors, Part.makeBox(NEMA14, NEMA14, NEMA14,
+                                      V(-NEMA14 / 2, y1 - NEMA14 / 2, Z_YDRIVE - NEMA14 / 2)))
+    x0, x1 = XSYNC_X, -XSYNC_X                                # x-belt pulley centres
+    for y in (PALM_Y - RAIL_DY - 12, PALM_Y + RAIL_DY + 12):
+        for x in (x0, x1):
+            metal = add(metal, rod(PULLEY_R, (x, y - 4, Z_XDRIVE), (0, 1, 0), 8))
+        for dz in (-PULLEY_R, PULLEY_R):
+            belts = add(belts, Part.makeBox(x1 - x0, 6, 1.5, V(x0, y - 3, Z_XDRIVE + dz - 0.75)))
+    y_motor = 12.0                                             # stepper at the front, shaft along y
+    metal = add(metal, rod(2.5, (x0, y_motor + NEMA14, Z_XDRIVE), (0, 1, 0),
+                           PALM_Y + RAIL_DY + 16 - y_motor - NEMA14))
+    motors = add(motors, Part.makeBox(NEMA14, NEMA14, NEMA14,
+                                      V(x0 - NEMA14 / 2, y_motor, Z_XDRIVE - NEMA14 / 2)))
+    return belts, metal, motors
+
+
+def electronics():
+    sbc = Part.makeBox(85, 56, 17, V(10, 8, FLOOR + 3))                 # Raspberry Pi 5
+    ctl = Part.makeBox(62, 50, 15, V(-58, 8, FLOOR + 3))                # GRBL/FluidNC + 2x TMC2209
+    brl = Part.makeBox(55, 45, 14, V(-TS * 32, BOX_L - 75, FLOOR + 1))  # Braille HV driver
+    mic = Part.makeBox(24, 24, 4, V(-TS * 80 - 4.5, 286, PLATE_UNDER - 4))
+    return sbc, ctl, brl, mic
+
+
+def forearm_pad():
+    """Optional padded rest in front of the box so the forearm stays level with the top."""
+    p = rbox(120, 140, BOX_H, 20, -60, -142, 0)
+    return p.makeFillet(10, [e for e in p.Edges if e.BoundBox.ZMin > BOX_H - 0.01])
+
+
+def hand_dummy():
+    """Rough adult hand, PALM DOWN, resting in the recess (collision envelope)."""
+    h = rbox(90, 105, 28, 12, -45, WRIST_Y, PALM_Z)
+    for _, fx, fl in FINGERS:
+        h = h.fuse(rod(8.9, (finger_x(fx), FINGER_BASE_Y - 5, PALM_Z + 9), (0, 1, 0), fl + 5))
+        h = h.fuse(Part.makeSphere(8.9, V(finger_x(fx), FINGER_BASE_Y + fl, PALM_Z + 9)))
+    t = rod(10.9, (THUMB_ROOT[0], THUMB_ROOT[1], PALM_Z + 11), (*THUMB_DIR, 0), THUMB_LEN)
+    h = h.fuse(t).fuse(Part.makeSphere(10.9, V(THUMB_ROOT[0] + THUMB_DIR[0] * THUMB_LEN,
+                                               THUMB_ROOT[1] + THUMB_DIR[1] * THUMB_LEN, PALM_Z + 11)))
+    arm = rod(30, (0, -140, BOX_H + 30.2), (0, 1, 0), WRIST_Y + 140 + 12)
+    return h.removeSplitter(), arm
+
+
+# ---------------- moving parts (built at palm offset 0,0 / pen up) ----------------
+def ybar():
+    """Bar along x that moves in y; end blocks ride the y-rails, tabs clamp the y-belts."""
+    s = rod(ROD_R, (-RAIL_X + 5, PALM_Y, Z_YBAR), (1, 0, 0), 2 * RAIL_X - 10)
+    for sx in (-1, 1):
+        x = sx * RAIL_X
+        b = Part.makeBox(18, 22, 18, V(x - 9, PALM_Y - 11, Z_YBAR - 9))
+        b = b.cut(rod(BORE_R, (x, PALM_Y - 12, Z_YBAR), (0, 1, 0), 24))
+        tlen = BELT_X + 3 - RAIL_X - 9                     # block face -> outer belt edge
+        tab = Part.makeBox(tlen, 10, 4, V(x + 9 if sx > 0 else x - 9 - tlen, PALM_Y - 5,
+                                          Z_YDRIVE + PULLEY_R - 2))
+        s = s.fuse(b).fuse(tab)
+    return s.removeSplitter()
+
+
+def xbar():
+    """Bar along y that moves in x; end blocks ride the x-rails, tabs clamp the x-belts."""
+    s = rod(ROD_R, (0, PALM_Y - RAIL_DY + 5, Z_XBAR), (0, 1, 0), 2 * RAIL_DY - 10)
+    for sy in (-1, 1):
+        y = PALM_Y + sy * RAIL_DY
+        b = Part.makeBox(22, 18, 18, V(-11, y - 9, Z_XBAR - 9))
+        b = b.cut(rod(BORE_R, (-12, y, Z_XBAR), (1, 0, 0), 24))
+        tab = Part.makeBox(10, 6, 4, V(-5, (y + 9) if sy > 0 else (y - 15), Z_XDRIVE + PULLEY_R - 2))
+        s = s.fuse(b).fuse(tab)
+    return s.removeSplitter()
+
+
+def carriage():
+    """Cross block on both bars + bracket + push solenoid (10 mm stroke) that lifts the pen.
+    The solenoid sits at (PEN_DX, PEN_DY) so it clears both bars."""
+    c = rbox(26, 26, Z_XBAR + 6 - (Z_YBAR - 6), 3, -13, PALM_Y - 13, Z_YBAR - 6)
+    c = c.fuse(rbox(PEN_DX + 9, PEN_DY + 9, 4, 3, 0, PALM_Y, Z_XBAR + 6))          # bracket on top
+    c = c.cut(rod(BORE_R, (-14, PALM_Y, Z_YBAR), (1, 0, 0), 28))
+    c = c.cut(rod(BORE_R, (0, PALM_Y - 14, Z_XBAR), (0, 1, 0), 28))
+    sol = Part.makeCylinder(8, 32, V(PEN_DX, PALM_Y + PEN_DY, Z_XBAR + 10 - 32))
+    return c.fuse(sol).removeSplitter()
+
+
+def pen():
+    """Pointed pen (2 mm tip, 0.5 mm radius point) on the solenoid plunger; spring inside
+    limits the force on the palm. Built in the pen-up position."""
+    tip = PEN_UP_TIP
+    x, y = PEN_DX, PALM_Y + PEN_DY
+    shaft = Part.makeCylinder(1.5, 14, V(x, y, tip - 18))
+    cone = Part.makeCone(1.5, 0.5, 3.6, V(x, y, tip - 4))
+    ball = Part.makeSphere(0.5, V(x, y, tip - 0.5))
+    return shaft.fuse(cone).fuse(ball).removeSplitter()
+
+
+# ---------------- build ----------------
+doc = App.newDocument("HapticBoxV2")
+COLORS = {}
+
+
+def add(name, shape, col, alpha=0):
+    o = doc.addObject("Part::Feature", name)
+    o.Shape = shape
+    COLORS[name] = (col, alpha)
+    if App.GuiUp:
+        o.ViewObject.ShapeColor = col
+        o.ViewObject.Transparency = alpha
+    return o
+
+
+belts, metal, motors = drives()
+sbc, ctl, brl, mic = electronics()
+mods, pins = braille_parts()
+caps, switches = button_parts()
+hand, arm = hand_dummy()
+S = {
+    "Shell": add("Shell", shell(), (0.93, 0.93, 0.91), 0),
+    "TopPlate": add("TopPlate", top_plate(), (0.78, 0.86, 0.92), 55),
+    "ForearmPad": add("ForearmPad", forearm_pad(), (0.36, 0.40, 0.46), 0),
+    "WristPad": add("WristPad", wrist_pad(), (0.80, 0.55, 0.15), 0),
+    "Rails": add("Rails", rails(), (0.72, 0.74, 0.76), 0),
+    "Belts": add("Belts", belts, (0.12, 0.12, 0.12), 0),
+    "Pulleys": add("Pulleys", metal, (0.60, 0.62, 0.64), 0),
+    "Steppers": add("Steppers", motors, (0.18, 0.18, 0.2), 0),
+    "SBC": add("SBC", sbc, (0.10, 0.55, 0.25), 0),
+    "Controller": add("Controller", ctl, (0.15, 0.25, 0.65), 0),
+    "BrailleDriver": add("BrailleDriver", brl, (0.55, 0.15, 0.55), 0),
+    "Mic": add("Mic", mic, (0.10, 0.45, 0.20), 0),
+    "BrailleCells": add("BrailleCells", mods, (0.85, 0.85, 0.80), 0),
+    "BraillePins": add("BraillePins", pins, (0.95, 0.95, 0.95), 0),
+    "ButtonSwitches": add("ButtonSwitches", switches, (0.2, 0.2, 0.2), 0),
+    "HandDummy": add("HandDummy", hand, (0.95, 0.78, 0.66), 40),
+    "ForearmDummy": add("ForearmDummy", arm, (0.95, 0.78, 0.66), 40),
+}
+for name, cap in caps:
+    S["Button" + name] = add("Button" + name, cap, (0.90, 0.35, 0.10), 0)
+
+M = {
+    "YBar": add("YBar", ybar(), (0.29, 0.47, 0.66), 0),
+    "XBar": add("XBar", xbar(), (0.95, 0.52, 0.10), 0),
+    "Carriage": add("Carriage", carriage(), (0.30, 0.30, 0.32), 0),
+    "Pen": add("Pen", pen(), (0.75, 0.15, 0.15), 0),
+}
+PEN_STROKE = PEN_DOWN_TIP - PEN_UP_TIP
+
+
+def offsets(px, py, down):
+    """Machine offsets for palm coords (px, py); palm-down => mirror x (as print-on-palm)."""
+    mx = -px            # writing from below a palm-down hand: mirror so letters feel upright
+    cx, cy = mx - PEN_DX, py - PEN_DY                        # carriage centre
+    dz = PEN_STROKE * down
+    return {"YBar": (0, cy, 0), "XBar": (cx, 0, 0), "Carriage": (cx, cy, 0), "Pen": (cx, cy, dz)}
+
+
+def set_pose(px, py, down):
+    for k, (dx, dy, dz) in offsets(px, py, down).items():
+        M[k].Placement = Placement(V(dx, dy, dz), Rotation())
+
+
+set_pose(0, 0, 0)
+doc.recompute()
+
+
+# ---------------- checks ----------------
+def overlap(a, b):
+    return a.common(b).Volume if a.BoundBox.intersect(b.BoundBox) else 0.0
+
+
+INTENDED = {("Belts", "YBar"), ("Belts", "XBar"),           # belt clamps
+            ("Pen", "Carriage")}                            # pen runs inside the solenoid
+
+
+def run_checks():
+    ok = True
+    hand_s = S["HandDummy"].Shape
+
+    def rep(name, v, tol=1e-3):
+        nonlocal ok
+        bad = v > tol
+        ok &= not bad
+        print("  %-44s %10.4f mm^3  %s" % (name, v, "FAIL" if bad else "ok"))
+
+    print("Hand on the top (static):")
+    for k in S:
+        if k in ("HandDummy", "ForearmDummy", "BraillePins"):
+            continue
+        v = overlap(hand_s, S[k].Shape) + overlap(S["ForearmDummy"].Shape, S[k].Shape)
+        if v > 1e-3 or k in ("TopPlate", "ForearmPad"):
+            rep("hand/forearm vs %s" % k, v)
+    print("  raised Braille pins pressing into fingertips: %.1f mm (intended)" % 0.7)
+    print("Static parts vs each other:")
+    names = [k for k in S if k not in ("HandDummy", "ForearmDummy")]
+    worst = 0.0
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            if {a, b} in ({"BrailleCells", "BraillePins"}, {"TopPlate", "BraillePins"},
+                          {"Pulleys", "Steppers"}, {"Pulleys", "Belts"}):
+                continue
+            v = overlap(S[a].Shape, S[b].Shape)
+            if v > 1e-3:
+                rep("%s vs %s" % (a, b), v)
+            worst = max(worst, v)
+    print("  worst static overlap %.4f mm^3" % worst)
+
+    g = [-pw.WORKSPACE / 2 + pw.WORKSPACE * i / 4 for i in range(5)]
+    print("Gantry sweep: %d x %d poses over the %.0f mm workspace, pen up and down" %
+          (len(g), len(g), pw.WORKSPACE))
+    res = {}
+    stat = [k for k in S if k not in ("HandDummy", "ForearmDummy")]
+    for down in (0, 1):
+        for px in g:
+            for py in g:
+                set_pose(px, py, down)
+                for m in M:
+                    ms = M[m].Shape
+                    for k in stat:
+                        if (k, m) in INTENDED:
+                            continue
+                        res[(m, k)] = max(res.get((m, k), 0), overlap(ms, S[k].Shape))
+                    if m != "Pen":
+                        res[(m, "hand")] = max(res.get((m, "hand"), 0), overlap(ms, hand_s))
+                mm = list(M)
+                for i, a in enumerate(mm):
+                    for b in mm[i + 1:]:
+                        if (a, b) in INTENDED or (b, a) in INTENDED:
+                            continue
+                        res[(a, b)] = max(res.get((a, b), 0), overlap(M[a].Shape, M[b].Shape))
+                tip = M["Pen"].Shape.BoundBox.ZMax
+                key = "pen tip above recess floor, %s" % ("down" if down else "up")
+                res[key] = tip - PALM_Z
+    for k, v in sorted(res.items(), key=lambda kv: str(kv[0])):
+        if isinstance(k, str):
+            print("  %-44s %10.2f mm" % (k, v))
+        elif v > 1e-3 or k in (("Pen", "TopPlate"), ("Carriage", "TopPlate"), ("YBar", "XBar"),
+                               ("Carriage", "hand")):
+            rep("%s vs %s" % k, v)
+    print("  (%d moving pairs checked)" % len([k for k in res if not isinstance(k, str)]))
+    set_pose(0, 0, 0)
+    print("Box: %.0f W x %.0f L x %.0f H mm, top at %.0f mm; forearm pad %.0f mm in front" %
+          (BOX_W, BOX_L, BOX_H, BOX_H, 142))
+    print("Pen stroke %.1f mm (tip %.1f below plate underside -> %.1f into the palm)" %
+          (PEN_STROKE, PEN_UP_GAP, PEN_PRESS))
+    print("CLEARANCES OK" if ok else "INTERFERENCE DETECTED")
+    return ok
+
+
+def dump(path):
+    """Meshes for render_views.py: static parts + moving parts at the base pose."""
+    def mesh(shape, tol=0.4):
+        pts, tris = shape.tessellate(tol)
+        return {"v": [[round(p.x, 3), round(p.y, 3), round(p.z, 3)] for p in pts],
+                "f": [list(f) for f in tris]}
+    set_pose(0, 0, 0)
+    data = {"static": {k: mesh(o.Shape) for k, o in S.items()},
+            "moving": {k: mesh(o.Shape) for k, o in M.items()},
+            "colors": {k: [list(c), a / 100.0] for k, (c, a) in COLORS.items()},
+            "params": dict(PALM_Y=PALM_Y, PALM_Z=PALM_Z, BOX_H=BOX_H, BOX_W=BOX_W, BOX_L=BOX_L,
+                           PEN_STROKE=PEN_STROKE, WINDOW=WINDOW, PLATE_UNDER=PLATE_UNDER,
+                           TS=TS, WRIST_Y=WRIST_Y, buttons=BUTTONS, wrist_pad=WRIST_PAD,
+                           braille=[[finger_x(fx), pad_y(fl)] for _, fx, fl in FINGERS[:2]],
+                           mirror_x=True)}
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f)
+    print("Mesh dump", path)
+
+
+if App.GuiUp:
+    import FreeCADGui as Gui
+    from PySide import QtCore
+
+    Gui.activeDocument().activeView().viewIsometric()
+    Gui.SendMsgToActiveView("ViewFit")
+    t, x, y, z, _ = pw.build_path(TEXT)
+    old = getattr(App, "_writer_timer", None)
+    if old is not None:
+        old.stop()
+    t0 = time.monotonic()
+
+    def _tick():
+        try:
+            i = int(((time.monotonic() - t0) / pw.DT) % len(t))
+            set_pose(x[i], y[i], 1.0 - z[i] / pw.PEN_LIFT)
+            Gui.updateGui()
+        except Exception:
+            App._writer_timer.stop()
+
+    timer = QtCore.QTimer()
+    timer.timeout.connect(_tick)
+    timer.start(20)
+    App._writer_timer = timer
+
+    def stop_writer():
+        App._writer_timer.stop()
+
+    import __main__
+    __main__.stop_writer = stop_writer
+    App.Console.PrintMessage("Writing %r from below (%.1f s loop). stop_writer() to stop.\n"
+                             % (TEXT, t[-1]))
+else:
+    run_checks()
+    doc.saveAs(os.path.join(HERE, "haptic_box_v2.FCStd"))
+    Part.export([o for o in doc.Objects if "Dummy" not in o.Name],
+                os.path.join(HERE, "haptic_box_v2.step"))
+    print("Saved haptic_box_v2.FCStd and haptic_box_v2.step")
+    if os.environ.get("HAPTIC_DUMP"):
+        dump(os.environ["HAPTIC_DUMP"])
