@@ -217,6 +217,11 @@ class Planner:
                 self._hold(rows, T_PEN, 0.0)
                 self._hold(rows, 0.05)
                 self._hold(rows, T_PEN, PEN_LIFT)
+        elif kind == "longtap":                      # cue: pen held on the palm centre for `data` s
+            self._move(rows, [self.pos, (0.0, 0.0)], V_TRAVEL)
+            self._hold(rows, T_PEN, 0.0)
+            self._hold(rows, data)
+            self._hold(rows, T_PEN, PEN_LIFT)
         elif kind == "pause":
             self._hold(rows, data)
         elif kind == "home":
@@ -259,6 +264,8 @@ def event_gcode(kind, data, mirror=False, speed=1.0):
         g.append("G0 X0 Y0")
         for _ in range(data):
             g += ["M3 S1000", "G4 P%.2f" % (T_PEN + 0.05), "M5", "G4 P%.2f" % T_PEN]
+    elif kind == "longtap":
+        g += ["G0 X0 Y0", "M3 S1000", "G4 P%.2f" % (T_PEN + data), "M5", "G4 P%.2f" % T_PEN]
     elif kind == "pause":
         g.append("G4 P%.2f" % (data / speed))
     elif kind == "home":

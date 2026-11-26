@@ -1,25 +1,30 @@
-# Haptic Palm-Writing Box: Design Specification v0.2
+# ComLang Haptic Palm-Writing Box: Design Specification v0.3
 
 | | |
 |---|---|
-| **Status** | Concept agreed; prototype CAD complete and clearance-checked; hardware not yet built |
+| **Status** | Concept agreed; thin prototype CAD complete, clearance- and hand-fit-checked; hardware not yet built |
 | **Audience** | Anyone building, testing or extending the device from zero |
 | **Source of truth** | `haptic_box_v2.FCMacro` (parametric CAD). Every dimension in this document comes from that file. If the two disagree, the CAD wins; then fix this document |
-| **Supersedes** | v0.1 (hand inside an enclosed box, 5-bar linkage from above). See Appendix A |
+| **Supersedes** | v0.2 (80 mm tall box, sync-shaft drive layer, handprint well, Pause/Speed buttons). See Appendix A |
+| **What changed in v0.3** | Box **54 mm tall instead of 80** (§4.3). **Cover** between pen and palm (§4.5). **Glove-shaped** well (§4.1). **Thumb scroll wheel** for speed and pause (§4.5). **Mode** button: palm, Braille or both. **Tactile symbols** on every control. **Speaker display + Reset** (§4.9). App: speaker view, reset, mode, cover-material test (§7) |
 
 ![product](renders/v2_product.png)
 
 ## 0. What it is
 
-The **haptic palm-writing box** is a desktop device for people who cannot hear speech and cannot rely on sight, for example deafblind users.
+**ComLang** is a compact desktop device that turns speech into touch, completely offline. It is for people who cannot hear speech and cannot rely on sight, for example adults who became deafblind and never learned tactile sign language or Braille.
 
-1. The user lays one hand **palm down** in a hand-shaped recess on top of the box.
-2. A microphone picks up a speaker. Offline speech recognition turns the speech into text.
-3. A **single pointed pen** inside the box comes up through a window under the palm. It **traces block capitals on the palm**, one letter on top of the next. This is the *print-on-palm* method that deafblind people already use with human partners.
-4. Two refreshable **Braille cells** under the index and middle fingertips can show the same letters, which is faster for Braille readers.
-5. **Buttons** by the thumb and little finger let the user pause, repeat a word and change the speed without lifting the hand.
+1. The user lays one hand **palm down** in a **10 mm deep, glove-shaped well** on top of a 54 mm tall box. The well is open to the front, so the wrist and forearm lie level with the palm.
+2. Someone speaks into the microphone or types into the companion app. Offline speech recognition (Vosk) turns the speech into text.
+3. A **single pointed pen** inside the box presses up through a thin **protective cover** under the palm. It **traces block capitals on the palm**, one letter on top of the next. This is *print-on-palm*: people read it with no training.
+4. Two refreshable **Braille cells** under the index and middle fingertips show **the same letter at the same moment**. Users can communicate on day one and learn Braille along the way.
+5. The resting hand reaches its controls **without moving**:
+   - **Thumb scroll wheel:** roll away = faster, roll in = slower, press = pause.
+   - **Repeat:** the little finger swings out onto a cap with a raised circular arrow.
+6. The **free hand** has a **Mode** button: palm + Braille, palm only, or Braille only.
+7. The **speaker** sees on a **display** at the back of the box exactly what the user is receiving. If it is wrong, the speaker presses **Reset**: the device stops and gives the user a "correction" cue.
 
-The pen moves in **one plane on two axes**, on a crossed-rail XY gantry. A push solenoid moves it a short distance up and down to touch and leave the palm.
+The pen moves **in one plane on two axes**, on a crossed-bar XY gantry. A flat solenoid with a wedge lifts it 7 mm to touch and leave the palm.
 
 ![writing](renders/v2_writing.gif)
 
@@ -27,7 +32,7 @@ The pen moves in **one plane on two axes**, on a crossed-rail XY gantry. A push 
 
 ## 1. Decision record
 
-Use this section to reach and record the common conclusion. Each row names its source.
+Use this section to reach and record the common conclusion. Each row names its source. "Review 2" is the second design review (thin box, cover, controls, glove, display). "Pitch" is the ComLang pitch text.
 
 ### 1.1 Agreed
 
@@ -35,32 +40,48 @@ Use this section to reach and record the common conclusion. Each row names its s
 |---|---|---|
 | D1 | The base is a **box**. The hand rests **on top, palm down**. There is no tunnel or enclosure around the hand | Sketch + review |
 | D2 | **One pointed pen reaches up from below** through a window under the palm and traces the letters | Review: "one pointy pen below palm" |
-| D3 | The pen moves **in one plane on two axes**: a crossed-rail (Cartesian) XY gantry. Pen up/down is a short local stroke at the carriage, not a third gantry axis | Review |
-| D4 | **Buttons** at the thumb side and the little-finger side | Sketch circles |
-| D5 | **Refreshable Braille cells** under the fingertips | "+ Braille" on the sketch |
-| D6 | Primary output is print-on-palm **block capitals, one letter on top of the next**, with word and sentence cues (§7.3) | v0.1, kept |
-| D7 | The person uses it through an **app** (`haptic_app.py`): listen/type, queue, pause/repeat/skip, speed, mode, hardware connection | Review: "must be an app for me to use" |
+| D3 | The pen moves **in one plane on two axes** on a crossed-bar (Cartesian) gantry. Pen up/down is a short local stroke at the carriage, not a third gantry axis. *v0.3:* the bars now run on four perimeter shafts that are both rails and drive shafts (§4.3) | Review; Review 2 (thin) |
+| D4 | Controls by the thumb and little finger | Sketch circles |
+| D5 | **Refreshable Braille cells** under the fingertips | "+ Braille" on the sketch; Pitch |
+| D6 | Primary output is print-on-palm **block capitals, one letter on top of the next**, with word and sentence cues (§7.3) | v0.1, kept; Pitch |
+| D7 | The person uses it through an **app** (`haptic_app.py`) | Review: "must be an app for me to use"; Pitch: "companion app" |
 | D8 | The prototype is defined by a **parametric CAD model** (FreeCAD) | Review |
+| D9 | A **10 mm deep hand well**, cut through a separate upper layer, open to the front for the wrist | Review: "deeper cut-out for the hand" |
+| D11 | The app includes a **live 3D simulation of the CAD model** with an anatomical hand and forearm in three sizes | Review |
+| D13 | **The box is thin: 54 mm tall** (was 80). Palm surface at 44 mm, forearm pad 44 mm | Review 2: "more thin in the Z dimension" |
+| D14 | **A cover sits between the pen and the hand.** It is a membrane on a drop-in cassette, flush with the well floor. Hands and fingers never touch the mechanism. *Replaces v0.2 P4 (open window)* | Review 2: "otherwise deafblind people will likely harm themselves" |
+| D15 | **The cover material is chosen by experiment.** Letters are written through each candidate material and recognition is measured (test T13). The app has a built-in test mode for this (§7.5) | Review 2 (reviewer's suggestion) |
+| D16 | **Glove-shaped print instead of a handprint.** Each digit and the palm is the convex hull over the small, medium and large hand models + 5 mm: smooth "glove fingers" that fit many hand sizes | Review 2 |
+| D17 | **Speed up/down + pause on a thumb scroll wheel.** Roll away from the palm = faster, roll in = slower (one detent = ±0.1×), press = pause/resume. It replaces the v0.2 Pause cap and the ring-finger Speed bar (§4.6 explains why) | Review 2: "slider or a pair of buttons"; Pitch: "thumb scroll wheel (buttons)" |
+| D18 | **Every control carries a tactile symbol of its meaning:** Repeat = circular arrow, wheel = **+** (far end) / **−** (near end) / **‖** (beside it, press = pause), Mode = Braille cell + pen stroke, Reset = **×**. Lines 1.4 mm wide, 0.8 mm relief | Review 2; Pitch: "repeat button shaped like a circular arrow" |
+| D19 | **The user switches modes**: palm + Braille (default), palm only, Braille only. Mode button for the free hand + app. Each change is confirmed by touch (§7.3) | Review 2 |
+| D20 | **Speaker display:** the box shows the speaker the text being written (current letter highlighted, what was dropped struck through), so the speaker can **Reset** wrong output. Reset button next to it. The app also has a full-screen speaker view | Review 2: "so the speaker can see what the output is so it can be reset" |
+| D21 | **The Braille cells show the current letter, synchronised with the pen** (answers v0.2 open question 2) | Pitch: "simultaneously display that exact character" |
 
 ### 1.2 Proposed: confirm or change
 
 | # | Proposal (current CAD/app default) | Why | Alternatives |
 |---|---|---|---|
-| P1 | **Mirror the letters in x** for the palm-down box, so a letter feels the same relative to the hand as print-on-palm on an upturned hand | Keeps the convention users already know | Unmirrored ("as seen through the back of the hand"). Settled by user test T7 |
-| P2 | **Pen tip: 0.5 mm radius point** (the CAD default), force **0.3–1.0 N** set by a spring. The prototype also ships with 1.0 mm and 2.0 mm radius tips | "Pointy" gives a crisp line, but a fine point at 1 N can feel sharp | Choose after test T6 |
-| P3 | **Push solenoid** for pen up/down (fast, ~20–30 ms, binary). The return spring retracts the pen when unpowered, so it fails safe | Simple, quiet enough, fail-safe | Micro servo + lever (slower, continuous force control) |
-| P4 | **Open 84 × 84 mm window** plus a hand-present interlock | Nothing between pen and skin | Thin replaceable membrane over the window (more hygienic, dulls the sensation, risk of puncture with a sharp tip) |
-| P5 | Letter height **45 mm**, writing speed **120 mm/s**, ~29 letters/min | Fits an adult palm. Speed is adjustable in the app | 35 / 55 mm. Test T8 |
-| P6 | **Right hand by default.** `HAND="left"` mirrors the recess, buttons and Braille | Most users. Left is one parameter away | A reversible top plate |
-| P7 | **Hand-present pad** (capacitive disc at the wrist) as the motion interlock | The sketch shows a circle at the wrist | IR/ToF sensor looking up through the window |
-| P8 | **Separate forearm pad** in front of the box, 72 mm tall, so the forearm is level with the top | The box top is 72 mm above the table; without support the wrist would bend | Box sunk into a table cut-out |
-| P9 | **Braille cells are phase 2.** The plate already has their holes. MVP-1 shows Braille on screen only | Braille cells are the most expensive part (§4.8) | Include them in MVP-1 |
+| P1 | **Mirror the letters in x** for the palm-down box, so a letter feels the same relative to the hand as print-on-palm on an upturned hand | Keeps the convention users already know | Unmirrored. Settled by test T7 |
+| P2 | **Pen tip: 0.5 mm radius point** (CAD default), force **0.3–1.0 N** set by a spring. Also 1.0 mm and 2.0 mm radius tips. *With a cover, a fine point concentrates wear on the membrane. Run T13 with T05 and T10 tips* | "Pointy" gives a crisp line | Rolling Ø3 ball tip (no drag on the membrane). Choose after T6 + T13 |
+| P3 | **Flat frame solenoid + 35° wedge** for pen up/down: 10 mm plunger travel gives 7 mm lift. The return spring retracts the pen when unpowered | A tubular solenoid standing upright (v0.2) needs 45 mm of height | Micro servo + cam (too slow: ~100 ms) |
+| P5 | Letter height **45 mm**, writing speed **120 mm/s**, ~29 letters/min | Fits an adult palm. Speed is adjustable on the wheel | 35 / 55 mm. Test T8 |
+| P6 | **Right hand by default.** `HAND="left"` mirrors the well, controls and Braille | Most users | A reversible top plate |
+| P7 | **Hand-present pad** (capacitive disc at the wrist) as the motion interlock | Sketch shows a circle at the wrist | IR/ToF sensor looking up through the window |
+| P8 | **Separate forearm pad** in front of the box, 44 mm tall | The palm is 44 mm above the table | Box sunk into a table cut-out |
+| P9 | **Braille cells are phase 2.** The plate already has their holes. MVP-1 shows Braille on screen only. *The pitch presents Braille as a core feature: decide whether MVP-1 must have them* | Most expensive part (§4.8) | Include them in MVP-1 |
+| P10 | **Braille cells on a ±25 mm slider** along the finger direction, set once per user | Fixed cells fit medium fingertips only (§4.6) | Separate cell sets per size |
+| P11 | **Symbols raised (embossed)**, 0.8 mm. `SYMBOL_RELIEF = "etched"` switches every symbol to incised grooves 0.8 mm deep | Review 2 asked for etched symbols; the pitch says "raised, embossed". Raised lines are generally easier to read by touch, and stay readable after the parts get dirty. Settled by T15 | Etched |
+| P12 | **Wheel direction: away from the palm = faster.** Matches "roll up to speed up" in the pitch if "up" means away | For a palm-down hand, "up" and "down" are ambiguous | Reverse in the Pico firmware |
+| P13 | **Mode on a free-hand pocket button** at the front corner on the thumb side | Mode changes are rare. No comfortable resting-digit position is left (§4.6). A pocket stops the forearm pressing it | On the wheel (long press). Settled by T11 |
+| P14 | **Display flush in the top plate** (3.5" IPS, wide viewing angle), text rotated 180° to face the speaker across the table | Keeps the box flat | A hinged tilting display. A display on the user's side for sighted helpers |
+| P15 | **Touch cues:** correction (Reset) = 3 quick taps and/or 2 Braille flashes. Mode change = a 0.6 s long pen press and/or 1 flash. Word gap = 1 tap. `.` `!` = 2 taps | Every cue must feel different from the others | Taught signs, e.g. writing "X" for a correction |
 
 ### 1.3 Open questions (owner: product)
 
-1. Who operates the app day to day: the deafblind user, a companion, or both? This decides whether the Pi runs standalone with physical buttons only, or a laptop/tablet screen is always present.
-2. Should the Braille cells show the **current letter** (synchronised with the pen), or the **next letter** as a preview?
-3. Is a sentence-level "compression mode" acceptable (§11, risk R1)?
+1. Who operates the app day to day: the deafblind user, a companion, or both? This decides whether the Pi runs standalone with physical controls only (phase 2), or a laptop/tablet screen is always present.
+2. Is a sentence-level "compression mode" acceptable (§12, risk R1)?
+3. Should speed changes be confirmed by touch, e.g. a short Braille digit for the new speed? Today they are silent except for the writing tempo.
 
 ---
 
@@ -70,45 +91,50 @@ Use this section to reach and record the common conclusion. Each row names its s
 |---|---|---|
 | R-F1 | Write recognised or typed text on the palm as block capitals | All A–Z, 0–9, `?` (37 glyphs, `palm_writer.FONT`) |
 | R-F2 | Word and sentence cues | Word gap = 1 tap + 0.6 s; `.`/`!` = 2 taps |
-| R-F3 | Braille output for the same text | English Grade 1 (uncontracted); a run of digits gets one number sign |
-| R-F4 | User controls without lifting the hand | Pause/Resume, Repeat word, Speed (physical) + app keys |
+| R-F3 | Braille output for the same text, **synchronised with the pen** | English Grade 1 (uncontracted); a run of digits gets one number sign |
+| R-F4 | User controls without lifting the hand | Pause/resume and speed (thumb wheel), Repeat (little finger). Mode with the free hand. Duplicated as app keys |
 | R-F5 | Offline speech recognition | Vosk small en-us model, runs on a laptop or a Raspberry Pi 5 |
+| R-F6 | **Speaker sees the output and can reset it** | Box display + app speaker view show the current word with the current letter highlighted. Reset drops current and queued words and sends the correction cue within 0.5 s |
+| R-F7 | **Mode switching** | Palm + Braille / palm / Braille, from the Mode button or the app, confirmed by touch |
 | R-P1 | Writing area on the palm | 70 × 70 mm reachable; glyphs fit in 45 mm height |
 | R-P2 | Pen speed and acceleration | 120 mm/s writing, 250 mm/s travel, 3000 mm/s² |
-| R-P3 | Pen up/down | Stroke 7.5 mm; switch time ≤ 50 ms |
+| R-P3 | Pen up/down | Lift 7.0 mm; switch time ≤ 50 ms |
 | R-P4 | Contact force | Adjustable 0.3–1.0 N, set mechanically (spring), never by motor torque |
-| R-P5 | Positioning | Repeatability ≤ ±0.3 mm (the palm resolves ~10 mm, so this is generous) |
-| R-E1 | Ergonomics | Palm surface 72 mm above the table. Forearm supported level. Hand position fixed by the recess |
-| R-S1 | Safety | No restraints. The hand can be lifted off at any time. Motion only while a hand is present. The pen retracts on power loss. Max 12 V outside the box |
-| R-S2 | Hygiene | Wipeable top. Pen tip replaceable or disinfectable (70 % isopropyl alcohol) |
-| R-N1 | Noise and vibration | Steppers in silent mode (TMC2209 stealthChop). No vibration felt through the top except the pen |
+| R-P5 | Positioning | Repeatability ≤ ±0.3 mm |
+| R-E1 | Ergonomics | Box ≤ 55 mm tall. Palm surface 44 mm above the table, in a 10 mm deep well. Forearm supported level |
+| R-E2 | Control reach | Every resting-hand control used by one digit **without moving the hand**, for small, medium and large hands (§4.6): swing ≤ 25° (thumb) / ≤ 46° (little finger). ≥ 2 mm clearance to resting digits. Switch force 2.5–3.5 N so resting digits never trigger |
+| R-E3 | **Fit** | The glove well accepts every hand from the small to the large model with ≥ 5 mm room around each digit |
+| R-E4 | **Tactile identification** | Every control identifiable by touch alone (T15) |
+| R-S1 | Safety | No restraints. The hand can be lifted at any time. Motion only while a hand is present. Pen retracts on power loss. Max 12 V outside the box |
+| R-S2 | Hygiene | Wipeable top. Cover cassette removable for cleaning or replacement. Pen tip replaceable |
+| R-S3 | **Cover** | No opening between the user and the mechanism wider than 2 mm while the cover is fitted. The membrane survives ≥ 10 000 letters without puncture (T13) |
+| R-N1 | Noise and vibration | Steppers in silent mode (TMC2209 stealthChop) |
 
 ---
 
 ## 3. System architecture
 
 ```
- speaker's voice
-      │
+ speaker's voice                                    speaker's eyes
+      │                                                   ▲
   [USB mic] ──► haptic_app.py (laptop for MVP, Raspberry Pi 5 later)
                   │  Vosk speech-to-text (offline) → final phrases only
-                  │  queue of words  ← buttons (USB HID keys) / app keys
+                  │  queue of words  ← thumb wheel / Repeat / Mode / Reset (USB HID keys) / app keys
                   │  palm_writer: text → strokes → G-code (mirrored x)
                   │  palm_writer: text → Braille cells
-                  ▼
-        USB serial (115200)                       SPI/GPIO (phase 2)
-                  │                                        │
-     [Arduino Uno + CNC Shield V3, GRBL 1.1]        [Braille HV driver]
-       │X step/dir   │Y step/dir   │spindle out           │
-   [TMC2209]     [TMC2209]     [MOSFET]           [2 × piezo Braille cells]
-       │             │             │
-   NEMA14 X      NEMA14 Y      12 V push solenoid ──► pen ──► palm
-   (x-belts)     (y-belts)
+                  ▼                                        │
+        USB serial (115200)            USB CDC (Pico)      │  SPI/GPIO (phase 2)
+                  │                        │               │        │
+     [Arduino Uno + CNC Shield, GRBL]  [Pico: keys + display link]  [Braille HV driver]
+       │X step/dir │Y step/dir │spindle      │SPI                     │
+   [TMC2209]   [TMC2209]   [MOSFET]   [3.5" IPS display]   [2 × piezo Braille cells]
+       │           │           │
+   NEMA14 X    NEMA14 Y    12 V frame solenoid ──► wedge ──► pen ──► cover ──► palm
 ```
 
 **Signal conventions**
 - G-code coordinates are **relative to the palm centre** (work zero, set during calibration §9). Machine x is **mirrored**: `X = −palm_x` (P1).
-- Pen up/down uses GRBL's spindle output: `M3 S1000` pushes the pen up into the palm, `M5` retracts it. Laser mode is off (`$32=0`), so the pen does not depend on motion.
+- Pen up/down uses GRBL's spindle output: `M3 S1000` lifts the pen into the palm, `M5` retracts it. Laser mode is off (`$32=0`).
 
 ---
 
@@ -122,29 +148,33 @@ The origin is at the centre of the box front edge, on the table. +x is the user'
 
 | Feature | Value |
 |---|---|
-| Box outside | **260 (W) × 330 (L) × 72 (H)**, vertical corners R12 |
-| Walls / floor / top plate | 3 / 3 / 6 (top plate = 4 + 2 layers, §4.2) |
-| Palm surface (recess floor) | z = **70**; recess depth 2 |
+| Box outside | **260 (W) × 380 (L) × 54 (H)**, vertical corners R12. The rear 70 mm is the speaker strip |
+| Walls / floor / top plate | 3 / 3 / 14 (top plate = 4 mm floor layer + 10 mm well layer, §4.2) |
+| Plate underside / palm surface / top | z = 40 / **44** / 54. **Well depth 10** |
 | Wrist crease line | y = 100 |
 | **Writing centre** (palm centre) | **(0, 155)** |
-| **Window** | **84 × 84**, R8, centred on (0, 155): x −42…42, y 113…197 |
-| Pause button (thumb) | (−104, 160) |
-| Repeat button (thumb) | (−96, 212) |
-| Speed button (little finger) | (72, 220) |
-| Braille cell, index fingertip | (−30, 265) |
-| Braille cell, middle fingertip | (−10, 273) |
-| Hand-present pad (wrist) | (0, 75), Ø24 |
-| Mic grille / status LED | 4 × 4 holes Ø2.4 at x 80…95, y 290…305 / Ø4 at (105, 300) |
-| Forearm pad | 120 × 140 × 72, in front of the box (y −142…−2) |
+| **Window** | **84 × 84**, R8, centred on (0, 155) |
+| **Cover cassette** | 100 × 100, R10, in a 2.0 mm pocket in the floor layer; fingernail notch at (0, 104) |
+| **Thumb wheel** | Ø22 × 8, crown 4 mm above the floor, centre (−91.2, 157.3), rolls along (−0.84, 0.55), i.e. the thumb's axis when it rests on the wheel |
+| **Repeat** (little finger) | Ø26 domed cap, (60.9, 225.4) |
+| **Mode** (free hand) | Ø24 cap in a 4 mm pocket, (−93, 42) |
+| **Reset** (speaker) | Ø20 cap in a 4 mm pocket, (45, 340) |
+| **Speaker display** | 3.5" IPS module 85 × 55 × 6 in a pocket, centre (−25, 340), glass 1 mm below the top |
+| Braille cell, index / middle fingertip (medium hand) | (−35.4, 259.7) / (−10.0, 269.4), slider ±25 mm (P10) |
+| Hand-present pad (wrist channel floor) | (0, 75), Ø24 |
+| Mic grille / status LED | 4 × 4 holes Ø2.4 at x 80…95, y 328…343 (faces the speaker) / Ø4 at (108, 345) |
+| Forearm pad | 120 × 140 × 44, in front of the box (y −142…−2) |
 
-**Hand recess outline** (cut through the 2 mm upper plate layer):
-- Palm: 100 × 120 rounded rectangle, R15, x −50…50, y 92…212.
-- Fingers: slots 22 wide, R10, starting at y 195.
-  - index: x = −30, to y 289
-  - middle: x = −10, to y 297
-  - ring: x = +10, to y 292
-  - little: x = +30, to y 277
-- Thumb: slot 26 wide, 80 long, starting at (−42, 135). It points along (−0.6, 0.8), i.e. 37° out from the y axis toward the thumb side.
+**Glove-shaped well** (cut through the 10 mm upper layer; floor at z 44). It is generated from the hand model (§4.6), not drawn by hand:
+- **Palm of the glove:** convex hull of the palm sections and digit roots of the small, medium and large hands, + 5 mm.
+- **Glove fingers:** for each digit, the convex hull of its joints over all three hands, grown by the largest joint radius + 5 mm. The result is one smooth, rounded channel per digit, like the fingers of a glove, instead of the scalloped union of three handprints in v0.2. Hands between and slightly outside the modelled sizes, and of different proportions, fit with room to spare.
+- Wrist channel: 80 wide, from the front edge (y 0) to y 100.
+- The cover cassette footprint (+2 mm), so the cassette can always be lifted out.
+- Control access: the path from each resting fingertip to its control and the pressed pose (+3.5 mm), plus bays of cap radius + 5 mm (Repeat) and + 14 mm (wheel, which also holds the + / − / ‖ marks).
+- Top edge: round over by hand or router (R3). The CAD does not model this round-over.
+- Export the outline from the CAD (`TopPlate` → top face → DXF) rather than redrawing it.
+
+![section](renders/v2_section.png)
 
 ### 4.2 Enclosure
 
@@ -152,23 +182,27 @@ The origin is at the centre of the box front edge, on the table. +x is the user'
 
 | Part | Material and process (MVP) | Notes |
 |---|---|---|
-| **P01 Base tray** 260 × 330 × 66, walls 3, floor 3 | **MVP:** 3 mm plywood or acrylic, laser-cut with finger joints, glued. **Later:** 3D-printed in 4 quadrants, or vacuum-formed | The floor is the gantry datum: keep it flat to ±0.3 mm. A 3 mm aluminium floor plate is better if available. Rear wall: 7 vent slots 6 × 22, power jack Ø10 at (95, rear, z 30) |
-| **P02 Top plate, lower layer** 260 × 330 × **4** acrylic (PMMA), R12 corners | Laser-cut | Window 84 × 84 R8; button holes Ø19; Braille pin holes Ø1.6 (12×); mic holes Ø2.4; LED Ø4. Screwed to the tray with 8 × M3 into heat-set inserts in corner/side posts |
-| **P03 Top plate, upper layer** 260 × 330 × **2** | Laser-cut acrylic, HDPE or 2 mm EVA/neoprene laminated on 1 mm acrylic for a warmer feel | **The hand outline is cut through** this layer, which forms the 2 mm tactile recess without milling. Bond to P02 with transfer tape (3M 468MP-type) |
-| **P04 Forearm pad** 120 × 140 × 72 | 3D-printed or plywood box + 10 mm EVA foam + vinyl/neoprene cover | Separate part. Non-slip feet |
-| Feet | 4 × Ø15 rubber bumpers under the tray | Decouple vibration from the table |
+| **F01 Base tray** 260 × 380 × 40, walls 3, floor 3 | **MVP:** 3 mm plywood or acrylic, laser-cut with finger joints. **Later:** 3D-printed in quadrants or vacuum-formed | The floor is the gantry datum: flat to ±0.3 mm. Rear wall: 7 vent slots 6 × 18, DC jack Ø10 at (95, rear, z 22) |
+| **F02 Top plate, floor layer** 260 × 380 × **4** acrylic (PMMA) | Laser-cut, pocket engraved | Window 84 × 84 R8. **Cover pocket** 100.4 × 100.4 × 2.0 + notch. Wheel slot, axle slot, plunger holes Ø13, Braille pin holes Ø1.6 (12×), display cable slot 30 × 4, mic holes, LED, pad pocket |
+| **F03 Top plate, well layer** 260 × 380 × **10** | **MVP:** 2 × 5 mm laser-cut layers. **Better:** 10 mm HDPE, CNC-routed with a 3 mm round-over bit | **Glove well cut through.** Pockets: Mode and Reset (Ø29 × 4 deep), display (86 × 56 × 7 deep). Raised **+ − ‖** marks around the wheel: print and bond, or engrave the well layer away around them |
+| **F05 Cover cassette** | Frame: 1.7 mm PETG print or laser-cut acrylic, 100 × 100, opening 84 × 84. Membrane: 0.3 mm (T13 material) stretched and bonded on top | Drops into the pocket, top flush with the well floor. Make one cassette per test material |
+| **F04 Forearm pad** 120 × 140 × 44 | 3D-printed or plywood box + 10 mm EVA foam + vinyl cover | Separate part, level with the well floor |
+| Feet | 4 × Ø15 × 3 rubber bumpers | Decouple vibration from the table |
 
-### 4.3 XY gantry: crossed rails, one plane, two axes
+### 4.3 XY gantry: crossed bars on four drive shafts (the thin design)
 
 ![cut-away](renders/v2_cutaway.png)
 
-**Principle.** Two bars cross at right angles, and the carriage slides on both.
-- The **Y-bar** runs along x and moves in y on two **y-rails** at the sides.
-- The **X-bar** runs along y and moves in x on two **x-rails** at the front and back.
-- Each bar is pulled at **both ends** by belts on a common sync shaft, so it cannot rack (twist).
-- The two bars sit at different heights (z 34 and z 48), so they never touch. The carriage holds a bushing for each.
+**Why v0.2 was 80 mm tall.** v0.2 drove each bar from a separate sync shaft in a layer *under* the rails: drive axis at z 21, rails at 34 and 48, then a 32 mm upright solenoid on top. Three layers stacked.
 
-![section](renders/v2_section.png)
+**What v0.3 does.** It uses the Ultimaker-style crossed-bar gantry: **the four perimeter shafts are the rails and the drive shafts at the same time.** The drive layer disappears.
+- The **Y-bar** (Ø6) runs along x and moves in y. Its end blocks slide on the two **y-shafts** (left/right, Ø8, rotating).
+- The **X-bar** (Ø6) runs along y and moves in x. Its end blocks slide on the two **x-shafts** (front/back, Ø8, rotating).
+- The **y-belts** (one per side) loop around pulleys on the front and back **x-shafts**. Turning the back x-shaft moves both y-belts equally, so the Y-bar cannot rack.
+- The **x-belts** (front and back) loop around pulleys on the left and right **y-shafts**. Turning one y-shaft moves both x-belts equally, so the X-bar cannot rack.
+- The bushings slide on rotating shafts. This is normal in this design; use self-aligning sintered-bronze bushings.
+- The pen lifter lies **flat** (P3).
+
 ![section detail, pen down](renders/v2_section_detail.png)
 
 **Z stack** (from the table):
@@ -176,35 +210,35 @@ The origin is at the centre of the box front edge, on the table. +x is the user'
 | Item | z (mm) |
 |---|---|
 | Floor top | 3 |
-| Y-drive axis (Y-belts at z 15 and 27, pulleys Ø12.7) | 21 |
-| **Y-rails + Y-bar** (Ø8) | **34** |
-| **X-rails + X-bar + X-drive** (X-belts at 42 and 54) | **48** |
-| Carriage block | 28–54 (26 × 26 × 26) |
-| Solenoid (Ø16 × 32) | 26–58 |
-| Pen tip, retracted / pressed | 64 / 71.5 |
-| Top plate | 66–72; palm on the recess floor at 70 |
+| x-belts (runs) | 6.6 and 19.4 |
+| **y-shafts** (Ø8) + x-belt pulleys (GT2 20T, flange Ø18) | **13** |
+| **Y-bar** (Ø6) | **16** |
+| **X-bar** (Ø6) | **24** |
+| y-belts (runs) | 22.6 and 35.4 |
+| **x-shafts** (Ø8) + y-belt pulleys | **29** |
+| Carriage block | 10–30 (24 × 24 × 20) |
+| Pen lifter (flat solenoid 30 × 14 × 16 + wedge) | 10–26 |
+| NEMA14 motors (lying, 35 mm) | 3–38 |
+| Pen tip, retracted / pressed | 38.5 / 45.5 |
+| Top plate | 40–54: floor layer 40–44 (palm rests at **44**, on the cover over the window), well layer 44–54 |
 
-**Layout** (all from the CAD):
+The height is now set by the **NEMA14 motors** (3 + 35 + 2 mm clearance = plate underside at 40). NEMA11 motors (28 mm) would allow about 47 mm, at the cost of torque margin. The x-shafts sit 16 mm above the y-shafts so the x-belts and y-belts cross with clearance.
+
+**Layout** (all from the CAD, right hand):
 
 | Element | Position |
 |---|---|
-| y-rails | Ø8 × 158 at x = ±100, y 76…234; pillars at y 80 and 230 |
-| x-rails | Ø8 × 160 at y = 70 and 240, x −80…80; pillars at x ±76 |
-| Y-bar | Ø8 × 190 between two end blocks (18 × 22 × 18) that ride the y-rails. Belt-clamp tabs reach out to the y-belts at x = ±116 |
-| X-bar | Ø8 × 160 between two end blocks (22 × 18 × 18) that ride the x-rails. Clamp tabs to the x-belts at y = 58 and 252 |
-| Y-drive | Dual-shaft NEMA14 at (0, 262, 21), shaft along x. Ø5 × 240 sync shaft with GT2-20T pulleys at x = ±116. Idlers at y = 70 |
-| X-drive | NEMA14 at the front-left (x −88, y 12…47, z 48), shaft along y. Ø5 × 209 sync shaft with GT2-20T pulleys at y = 58 and 252. Idlers at x = +88 |
-| **Pen offset** | The pen and solenoid sit **+16, +16 mm** (diagonal) from the carriage centre, so they clear both bars. The calibration zero takes care of this offset (§9) |
+| y-shafts | Ø8 at x = ±110, z 13, y 55…253 (the X-motor side extended to 285). 688ZZ bearing blocks at y 59 and 249 |
+| x-shafts | Ø8 at y = 67 and 243, z 29, wall to wall (252 long). 688ZZ bearing posts at x ±120 |
+| y-belts | x = −70 (thumb side) and +80 (little-finger side). They avoid the wheel and the Repeat switch above them. Pulleys on the x-shafts. Clamped by tabs on the Y-bar end blocks |
+| x-belts | y = 81 and 229. Pulleys on the y-shafts at x ±110. Clamped by tabs reaching down from the X-bar end blocks |
+| X motor | NEMA14 at the rear on the thumb side (x −88, y 280…314), shaft along y. Short GT2 loop to the thumb-side y-shaft at y 275 |
+| Y motor | NEMA14 at the rear on the little-finger side (x 80, y 272), shaft along x. Short GT2 loop to the back x-shaft at x 58 |
+| **Pen offset** | The pen sits **+16, +16 mm** (diagonal) from the carriage centre, clear of both bars. The calibration zero handles this (§9) |
 
 **Travel.** Pen: ±35 mm about (0, 155). Carriage centre: x −51…19, y 104…174.
-**Steps.** GT2 belt (2 mm pitch) on a 20T pulley gives 40 mm per rev. 200 steps × 1/16 microsteps = **80 steps/mm**. 250 mm/s needs 20 kHz, which is within GRBL-on-Uno limits.
-
-**Bearings.** Use sintered-bronze (oilite) bushings 8 × 12 × 12 mm pressed into the printed blocks: 2 in the carriage, 1 in each of the 4 end blocks. LM8UU ball bushings (Ø15 × 24) are an option if the blocks grow to ≥ 24 mm. Sync shafts run in 625ZZ bearings (5 × 16 × 5) in printed bearing blocks.
-
-**Belts.** GT2 6 mm, open belt, both ends clamped in the bar's tab.
-- y-belts: 2 × ~430 mm.
-- x-belts: 2 × ~392 mm.
-- Tension with slotted idler mounts (2 × M3) to ~3–5 N; the belt should deflect ~2 mm under a light finger.
+**Steps.** GT2 (2 mm pitch) on 20T pulleys gives 40 mm per rev. With 1:1 short belts, 200 steps × 1/16 = **80 steps/mm**, as before.
+**Belts.** GT2 6 mm. y-belts 2 × ~392 mm, x-belts 2 × ~480 mm, open, both ends clamped. Short motor belts: closed GT2 loops of ~90–100 mm on slotted motor mounts. Tension so the belt deflects ~2 mm under a light finger.
 
 ### 4.4 Pen actuator and tip
 
@@ -212,68 +246,120 @@ The origin is at the centre of the box front edge, on the table. +x is the user'
 
 | Item | Spec |
 |---|---|
-| Solenoid | 12 V **push** type, tubular, ≤ Ø16 × 32 mm body, **≥ 10 mm stroke**, ≥ 2 N at 7.5 mm, built-in return spring, ≤ 1 A. Flyback diode across the coil |
-| Stroke used | 7.5 mm: tip at z 64 (2 mm below the plate underside) → z 71.5 (1.5 mm above the recess floor, i.e. pressing into the skin) |
-| Pen | Ø3 stainless or POM rod with an M3 thread for interchangeable tips. It slides in a Ø3 PTFE/brass sleeve on the plunger |
-| **Force limiter** | Compression spring between plunger and pen: rate ~0.3 N/mm, preload 0.2 N, 2 mm over-travel → 0.8 N max. Shims set 0.3–1.0 N. **Force never depends on solenoid strength** |
-| Tips (P2) | T05: 0.5 mm radius point (default, "pointy"). T10: 1.0 mm radius. T20: Ø4 ball. Turned brass/stainless or printed resin. Smooth finish, no burrs |
-| Hold current | After pull-in, reduce to ~40 % with GRBL `S400` to limit heating. Duty during writing ≈ 60 % |
+| Lifter | 12 V **push-pull frame solenoid** (JF-0530B class, ~30 × 14 × 16 mm, 10 mm stroke) lying flat on the carriage. Its plunger pushes a **35° wedge** under a roller on the pen: 10 mm plunger → 7 mm lift. The solenoid is strongest when closed, which is when the pen presses. Return spring retracts the pen when unpowered. Flyback diode |
+| Stroke | 7.0 mm: tip at z 38.5 (1.5 mm below the plate underside, 5.5 mm below the cover) → z 45.5 (1.5 mm above the floor, pressing the membrane into the skin) |
+| Pen | Ø3 stainless or POM rod with an M3 thread for interchangeable tips, in a Ø9 printed sleeve on the carriage |
+| **Force limiter** | Compression spring between the wedge roller and the pen: ~0.3 N/mm, preload 0.2 N → 0.8 N max. Shims set 0.3–1.0 N. Force never depends on solenoid strength. *Calibrate with the cover fitted: the membrane takes part of the force* |
+| Tips (P2) | T05: 0.5 mm radius point. T10: 1.0 mm radius. T20: Ø4 ball. Option: rolling Ø3 ball |
+| Hold current | After pull-in, reduce with GRBL `S400` to limit heating |
 
 ### 4.5 Hand interface
 
 | Element | Implementation |
 |---|---|
-| Recess | 2 mm cut-out in P03 (§4.1). Edges broken (0.5 mm chamfer or sanded). Users find the position by touch |
-| Buttons (3) | 19 mm momentary panel push-buttons (hole Ø19), domed caps. **Braille letter on each cap:** P (Pause), R (Repeat), S (Speed). Switch body under the plate (≤ 14 × 14 × 12) |
-| Hand-present pad | Ø24 brass disc inlaid 0.4 mm into the top, wired to a capacitive touch module (TTP223-type) |
-| Braille cells (phase 2) | 2 cells, 6 dots, 2.5 mm dot pitch. Each cell module 12 × 44 × 16 under the plate; pins come up through Ø1.6 holes in the finger-slot floor. Dots 1–3 on the reader's left (−x), dot 1 furthest away (the fingertip reads as on paper) |
+| Glove well | 10 mm deep cut-out in F03 (§4.1), top edge R3 |
+| **Cover** | Drop-in cassette (F05) over the window, membrane top flush with the well floor. The pen presses it 1.5 mm into the palm. The palm rests on the membrane over the 84 mm opening; the membrane must sag **< 3 mm** under a resting palm so it never touches the retracted pen (5.5 mm below). Swap cassettes to run T13. Clean with 70 % isopropyl alcohol |
+| **Thumb wheel** (D17) | Ø22 × 8 knurled wheel (20 ribs) on a **detented rotary encoder with push switch** (EC11 class, 20 detents, ~3 N push). The axle goes to the encoder under the floor layer. The crown stands 4 mm above the floor in a 10 × 22 slot. Roll away = faster (+0.1× per detent), roll in = slower, press = pause/resume. Raised **+** at the far end, **−** at the near end, **‖** beside it on the floor (Ø7 symbols, 0.8 mm). The thumb swings out 22° to reach it (all sizes) |
+| **Repeat** | 3D-printed domed cap Ø26, 4.5 mm tall, 0.5 mm above the floor, with a **raised circular arrow** (Ø12, 1.4 mm line, arrowhead). Ø12 stem through a Ø13 hole onto a low-profile 12 × 12 tactile switch (2.5–3.5 N) under the plate |
+| **Mode** (free hand) | Flat Ø24 cap in a 4 mm pocket at the front corner on the thumb side, top 1 mm below the surface. Raised **6-dot Braille cell + pen stroke** symbol. 12 × 12 switch |
+| Symbols (D18, P11) | Lines 1.4 mm wide, raised 0.8 mm (or etched 0.8 mm deep), sized 12–17 mm. Print the caps with the symbol on top (resin or 0.1 mm layers), so the edges are crisp |
+| Control reach | From the hand-model study (§4.6). Validate with real users in T11 |
+| Hand-present pad | Ø24 brass disc inlaid 0.4 mm into the wrist-channel floor, wired to a capacitive touch module (TTP223 type) |
+| Braille cells (phase 2) | 2 cells, 6 dots, 2.5 mm pitch. Module 12 × 44 × 16 under the plate; pins through Ø1.6 holes. Dots 1–3 on the reader's left (−x), dot 1 furthest away |
 
-### 4.6 Fabricated parts list
+![tactile symbols](renders/v2_symbols.png)
+
+### 4.6 Hand model, fit and reach study
+
+The CAD contains a parametric **anatomical hand and forearm** (`hand_model.py`) in three sizes:
+
+| Size | Hand length × breadth | Represents |
+|---|---|---|
+| small | 165 × 70 mm | ~5th percentile woman |
+| medium | 190 × 87 mm | ~50th percentile man |
+| large | 205 × 97 mm | ~95th percentile man |
+
+Forearm and palm are lofted elliptical sections, flattened 2 mm where they rest. Fingers have three phalanges; the thumb has a metacarpal + two phalanges. Every hand is placed with its wrist crease at y = 100.
+
+![hand sizes](renders/v2_hand_sizes.png)
+
+Running the macro (`freecadcmd haptic_box_v2.FCMacro`) prints this study:
+
+| Size | Rest fit | Thumb wheel | Repeat (little finger) | Palm centre vs writing centre | Fingertips vs Braille cells |
+|---|---|---|---|---|---|
+| small | no clash | swing 22°, presses | swing 32°, presses | −9.6 mm | 23 mm short |
+| medium | no clash | swing 22°, presses | swing 39°, presses | −2.8 mm | on the cells |
+| large | no clash | swing 22°, presses | swing 46°, presses | +1.4 mm | 14 mm beyond |
+
+![control use](renders/v2_button_press.png)
+
+**Why speed went on the thumb wheel, and Mode to the free hand.** The study searched every digit and swing direction for positions that all three hand sizes reach and that clear the resting hand by 2 mm:
+- **Thumb:** outward swing ~20°. This is the only comfortable spot, and it is the best one, so the wheel combines speed and pause there.
+- **Little finger:** outward swing 32–46°, used by Repeat.
+- **Index and middle:** only reachable at 33° and 55° swings, above the comfort limits in R-E2. They also rest on the Braille cells.
+- **Ring:** only press-down under the fingertip. This was the v0.2 Speed bar. A single press can't give up *and* down, so it was dropped.
+
+So the resting hand has two good control positions. The thumb wheel puts three functions on one of them. Mode is rare, so it went to the free hand (P13).
+
+**Known limits.** Joint angles are estimates. Real hands vary in proportion. The 46° little-finger swing for large hands is near the limit. Test T11 with real users is what counts.
+
+### 4.7 Fabricated parts list
 
 | ID | Part | Qty | Material / process | Key dimensions |
 |---|---|---|---|---|
-| P01 | Base tray | 1 | 3 mm plywood/acrylic, laser | 260 × 330 × 66, R12 |
-| P02 | Top plate, lower | 1 | 4 mm PMMA, laser | 260 × 330, holes per §4.1 |
-| P03 | Top plate, upper (recess) | 1 | 2 mm PMMA/HDPE (or EVA on 1 mm PMMA), laser | Hand outline cut-out |
-| P04 | Forearm pad | 1 | PLA/plywood + EVA | 120 × 140 × 72 |
-| P10 | Rail pillar, y | 4 | PETG print | 12 × 8, rod centre z 34 |
-| P11 | Rail pillar, x | 4 | PETG print | 8 × 12, rod centre z 48 |
-| P12 | Y-bar end block + belt tab | 2 | PETG print, bronze bushing | 18 × 22 × 18, tab to x ±116 |
-| P13 | X-bar end block + belt tab | 2 | PETG print, bronze bushing | 22 × 18 × 18 |
-| P14 | Carriage (cross block + solenoid bracket) | 1 | PETG print, 2 bushings | 26 × 26 × 26 + bracket 25 × 25 × 4 |
-| P15 | Motor mounts (X, Y) | 2 | PETG print | NEMA14 31 mm hole pattern, M3 |
-| P16 | Sync-shaft bearing blocks | 4 | PETG print, 625ZZ | Shaft axis z 21 (Y) / z 48 (X) |
-| P17 | Idler mounts, slotted | 4 | PETG print | ±4 mm tension slot |
-| P18 | Pen + tips | 1 + 3 | Stainless/brass, turned | Ø3, M3 thread |
-| P19 | Electronics standoffs | — | M3 nylon | 3 mm above the floor |
+| F01 | Base tray | 1 | 3 mm plywood/acrylic, laser | 260 × 380 × 40, R12 |
+| F02 | Top plate, floor layer | 1 | 4 mm PMMA, laser | 260 × 380, §4.2 |
+| F03 | Top plate, well layer | 1 (or 2 × 5 mm) | 10 mm HDPE or 2 × 5 mm laser | Glove well, pockets |
+| F04 | Forearm pad | 1 | PLA/plywood + EVA | 120 × 140 × 44 |
+| F05 | Cover cassettes | 1 per material | PETG frame + membrane | 100 × 100 × 2.0 |
+| F20 | Caps: Repeat, Mode, Reset; thumb wheel | 3 + 1 | Resin or fine PETG print | Ø26 / Ø24 / Ø20 with raised symbols; wheel Ø22 × 8, 20 ribs, D-bore for the encoder |
+| F21 | Switch / encoder PCBs | 4 | Perfboard | Under F02 |
+| F10 | y-shaft bearing blocks | 4 | PETG, 688ZZ | Shaft axis z 13 |
+| F11 | x-shaft bearing posts | 4 | PETG, 688ZZ | Shaft axis z 29 |
+| F12 | Y-bar end block + belt tab | 2 | PETG, Ø8 bronze bushing | 18 × 22 × 16, tab to the y-belt |
+| F13 | X-bar end block + belt tab | 2 | PETG, Ø8 bronze bushing | 18 × 14 × 16, tab down to the x-belt |
+| F14 | Carriage + pen head (sleeve, solenoid seat, wedge guide) | 1 | PETG, 2 × Ø6 bushings | 24 × 24 × 20 |
+| F15 | Motor mounts, slotted | 2 | PETG | NEMA14, 31 mm pattern |
+| F16 | Wedge + roller | 1 | POM / steel pin | 35° |
+| F18 | Pen + tips | 1 + 3 | Stainless/brass | Ø3, M3 |
 
-### 4.7 Purchased parts (BOM)
+### 4.8 Purchased parts (BOM)
 
 | # | Item | Qty | Spec / note |
 |---|---|---|---|
-| 1 | Linear rod Ø8 h6, hardened | 6 | Cut to 158 (2), 160 (3), 190 (1) |
-| 2 | Steel shaft Ø5 | 2 | 240 and 209 |
-| 3 | Bronze bushing 8 × 12 × 12 | 6 | Or LM8UU (needs bigger blocks) |
-| 4 | Bearing 625ZZ | 4 | Sync shafts |
+| 1 | Shaft Ø8 h6, hardened | 4 | 198, 230, 252, 252 |
+| 2 | Rod Ø6 h6 | 2 | 206 (Y-bar), 166 (X-bar) |
+| 3 | Self-aligning bronze bushing Ø8 / Ø6 | 4 / 2 | End blocks / carriage |
+| 4 | Bearing 688ZZ (8 × 16 × 5) | 8 | Shaft ends |
 | 5 | GT2 6 mm belt | 2 m | Open belt |
-| 6 | GT2 20T pulley, 5 mm bore | 4 | On the sync shafts |
-| 7 | GT2 idler 20T, 5 mm bore (or 3 mm) | 4 | |
-| 8 | NEMA14 stepper 35 × 35 × 34, 1.8° | 2 | One **dual-shaft** (Y). ~0.6–1.0 A |
-| 9 | Flexible coupler 5–5 mm | 3 | |
-| 10 | Arduino Uno R3 + CNC Shield V3 | 1 | GRBL 1.1 |
-| 11 | TMC2209 step-stick | 2 | Standalone, stealthChop, 1/16 |
-| 12 | 12 V push solenoid, ≥ 10 mm stroke | 1 | §4.4 |
-| 13 | Logic-level MOSFET module + flyback diode | 1 | IRLZ44N-type, 1N5819 |
-| 14 | Microswitch (limit) | 2 | X-min, Y-min homing |
-| 15 | 19 mm momentary push-button | 3 | |
-| 16 | Raspberry Pi Pico (RP2040) | 1 | Buttons + pad → USB keyboard (HID) |
-| 17 | TTP223 capacitive module + Ø24 brass disc | 1 | Hand-present |
-| 18 | USB microphone | 1 | Under the grille, or external |
-| 19 | 12 V 5 A DC supply + 5.5/2.1 jack | 1 | |
-| 20 | M3 screws, heat-set inserts, nuts | set | |
-| 21 | Compression springs, 0.3 N/mm, for Ø3 pen | 3 | Shim to the target force |
-| 22 | **Phase 2:** Raspberry Pi 5 (4 GB) + 12→5 V 5 A buck | 1 | Standalone operation |
-| 23 | **Phase 2:** piezo Braille cells + HV driver (~200 V) | 2 | Most expensive item. Choose a module with an integrated driver (e.g. a Metec-type cell with a serial driver board). Follow the HV safety rules in the datasheet |
+| 6 | GT2 20T pulley, 8 mm bore / 5 mm bore | 10 / 2 | 8 belt pulleys + 2 short-belt pulleys on shafts / motors |
+| 7 | GT2 closed loop ~100 mm | 2 | Motor short belts |
+| 8 | NEMA14 stepper 35 × 35 × 34 | 2 | ~0.6–1.0 A |
+| 9 | Arduino Uno R3 + CNC Shield V3 | 1 | GRBL 1.1 |
+| 10 | TMC2209 step-stick | 2 | stealthChop, 1/16 |
+| 11 | 12 V push-pull frame solenoid, 10 mm stroke | 1 | §4.4 |
+| 12 | Logic-level MOSFET + flyback diode | 1 | IRLZ44N, 1N5819 |
+| 13 | Microswitch (limit) | 2 | X-min, Y-min |
+| 14 | **Rotary encoder with push switch, detented** | 1 | EC11 class, 20 detents |
+| 15 | 12 × 12 mm tactile switch, low profile, 2.5–3.5 N | 3 | Repeat, Mode, Reset |
+| 16 | Raspberry Pi Pico (RP2040) | 1 | Encoder + switches + pad → USB HID keys; display link (USB CDC) |
+| 17 | **3.5" IPS SPI display 480 × 320** (ILI9488 / ST7796 class) | 1 | Speaker display, driven by the Pico |
+| 18 | TTP223 module + Ø24 brass disc | 1 | Hand-present |
+| 19 | USB microphone | 1 | Under the grille, or external |
+| 20 | 12 V 5 A DC supply + jack | 1 | |
+| 21 | Cover membrane samples | set | T13 list (§10) |
+| 22 | M3 screws, heat-set inserts, compression springs for Ø3 pen | set | |
+| 23 | **Phase 2:** Raspberry Pi 5 + 12→5 V 5 A buck | 1 | Standalone |
+| 24 | **Phase 2:** piezo Braille cells + HV driver | 2 | Most expensive item (P9) |
+
+### 4.9 Speaker strip
+
+The rear 70 mm of the box faces the speaker, who usually sits across the table.
+- **Display:** 3.5" IPS, flush, text rotated 180°. It shows the word being written in large letters, with done letters grey and the current letter highlighted. Underneath are the last few phrases, with dropped words struck through, plus the mode, words waiting, and a paused flag.
+- **Reset:** pocket button (×) next to it.
+- **Microphone grille** and status LED.
+
+The app's **speaker display** window (§7.2) shows the same thing on a laptop or tablet.
 
 ---
 
@@ -283,56 +369,51 @@ The origin is at the centre of the box front edge, on the table. +x is the user'
 
 | Consumer | Supply | Current (peak) |
 |---|---|---|
-| 2 × NEMA14 via TMC2209 | 12 V | 2 × 0.6 A (set Vref for ~0.5 A RMS, enough for this light gantry) |
-| Solenoid | 12 V | ≤ 1 A pull-in, ~0.4 A hold |
-| Uno + Pico + TTP223 | 5 V via USB | < 0.2 A |
-| Pi 5 (phase 2) | 5 V / 5 A buck | ≤ 3 A typical |
-| **Total** | **12 V** | **≈ 3 A (MVP), ≈ 5 A with the Pi** → 12 V 5 A supply |
+| 2 × NEMA14 via TMC2209 | 12 V | 2 × 0.6 A |
+| Pen solenoid | 12 V | ≤ 1 A pull-in, ~0.4 A hold |
+| Uno + Pico + TTP223 + display | 5 V via USB | < 0.3 A |
+| Pi 5 (phase 2) | 5 V / 5 A buck | ≤ 3 A |
+| **Total** | **12 V** | ≈ 3 A (MVP), ≈ 5 A with the Pi |
 
 ### 5.2 Wiring (MVP)
 
 | From | To | Note |
 |---|---|---|
-| 12 V jack | CNC Shield V+ / GND | Add a 3 A inline fuse |
-| X driver (shield X socket) | X stepper | Set the TMC2209 microsteps to 1/16 with the MS1/MS2 jumpers (see the TMC2209 standalone table) |
-| Y driver (shield Y socket) | Y stepper (dual-shaft) | |
-| X-min / Y-min endstops | Shield X−/Y− | Normally-open to GND; `$5` sets the polarity |
-| GRBL spindle output | MOSFET gate | **Pin check:** in GRBL 1.1 with variable spindle (the default), the spindle PWM, which also acts as enable, is on **D11**. Z-limit moves to D12, and D13 is spindle *direction*. The CNC Shield V3 silk labels follow GRBL 0.9 (SpnEn = D12, Z+ = D11). Wire the MOSFET gate to **D11** by pin number, not by the label, and confirm against `cpu_map.h` of the GRBL build you flash |
-| MOSFET drain | Solenoid −. Solenoid + to 12 V | Flyback diode across the coil (cathode to +12 V) |
-| Pause button | **also** to GRBL feed-hold (A1) | The pause works in hardware even if the app hangs |
-| 3 buttons + TTP223 | Pico GPIO (pull-ups) | Pico firmware sends keys: Space = Pause, R = Repeat, S/+ = Speed, F9 = hand present (§7.4) |
-| Uno USB, Pico USB, mic USB | Laptop (MVP) / Pi 5 (phase 2) | |
+| 12 V jack | CNC Shield V+ / GND | 3 A inline fuse |
+| X / Y drivers | X / Y steppers | 1/16 microsteps |
+| X-min / Y-min | Shield X−/Y− | Normally-open to GND |
+| GRBL spindle output | MOSFET gate | **Pin check:** GRBL 1.1 with variable spindle puts spindle PWM/enable on **D11** (the shield silk label says Z+). Wire by pin number; confirm against `cpu_map.h` |
+| MOSFET drain | Solenoid −; solenoid + to 12 V | Flyback diode across the coil |
+| Wheel push switch | **also** to GRBL feed-hold (A1) | Pause works in hardware even if the app hangs |
+| Encoder A/B, wheel switch, Repeat, Mode, Reset, TTP223 | Pico GPIO (pull-ups) | Pico sends keys: wheel away = `+`, wheel in = `−`, wheel press = Space, Repeat = R, Mode = M, Reset = Esc, hand present = F9 (down/up) |
+| Display (SPI) | Pico SPI0 | Pico shows lines received over USB CDC (§7.4) |
+| Uno, Pico, mic USB | Laptop (MVP) / Pi 5 (phase 2) | |
 
 ### 5.3 Electrical safety
-- Only 12 V DC enters the box. The external supply carries the safety approval.
-- The Braille HV (phase 2) stays inside a closed driver module. No exposed pins.
-- Keep the steppers' motor current low (0.5 A). The belt drive can still exert several newtons, which is why the interlock (§7.4) exists.
+- Only 12 V DC enters the box.
+- The Braille HV (phase 2) stays inside a closed driver module.
+- Keep the motor current low (0.5 A). The interlock (§7.4) and the cover keep fingers away from the moving parts.
 
 ---
 
 ## 6. Firmware (GRBL 1.1 on the Uno)
 
-Flash GRBL 1.1h, then send these settings (`$$` lists them):
-
 | Setting | Value | Meaning |
 |---|---|---|
-| `$100` / `$101` | 80 | steps/mm X / Y (GT2 + 20T, 1/16) |
+| `$100` / `$101` | 80 | steps/mm X / Y |
 | `$110` / `$111` | 15000 | max rate mm/min (250 mm/s) |
 | `$120` / `$121` | 3000 | accel mm/s² |
-| `$130` / `$131` | 75 | max travel X / Y (pen ±35 plus margin) |
-| `$20` / `$21` | 1 / 1 | soft and hard limits on |
-| `$22` | 1 | homing enabled |
-| `$23` | 3 | home towards X−, Y− |
-| `$27` | 2 | pull-off mm |
-| `$30` / `$31` | 1000 / 0 | spindle S range (S1000 = pull-in, S400 = hold) |
-| `$32` | 0 | laser mode off |
-| `$1` | 255 | keep the motors energised (holds position) |
-| `$3` | set on test | invert X so that `X+` = −palm-x if wiring differs (P1) |
+| `$130` / `$131` | 75 | max travel |
+| `$20` / `$21` | 1 / 1 | soft and hard limits |
+| `$22` / `$23` / `$27` | 1 / 3 / 2 | homing on, towards X−/Y−, pull-off 2 mm |
+| `$30` / `$31` / `$32` | 1000 / 0 / 0 | spindle range, laser mode off |
+| `$1` | 255 | keep motors energised |
+| `$3` | on test | invert X if the wiring differs (P1) |
 
-**G-code produced by the app** (`palm_writer.event_gcode`), in work coordinates where **(0, 0) is the palm centre**:
+**G-code produced by the app** (`palm_writer.event_gcode`), work zero = palm centre:
 
 ```
-G0 X15.75 Y22.50        ; travel to the start of a stroke (pen down)
+G0 X15.75 Y22.50        ; travel to the start of a stroke
 M3 S1000                ; pen up into the palm
 G4 P0.08                ; settle
 G1 X15.75 Y-22.50 F7200 ; draw at 120 mm/s
@@ -340,7 +421,7 @@ M5                      ; retract
 G4 P0.08
 ```
 
-To try it without the app: `python3 palm_writer.py "HELLO" --gcode hello.nc --mirror`, then stream the file with any GRBL sender.
+The mode-change cue is a `longtap`: `G0 X0 Y0`, `M3 S1000`, `G4 P0.68`, `M5`.
 
 ---
 
@@ -350,65 +431,109 @@ To try it without the app: `python3 palm_writer.py "HELLO" --gcode hello.nc --mi
 
 | File | Role |
 |---|---|
-| `haptic_app.py` | The app the person uses: Tkinter desktop GUI. Listen (Vosk) or type → queue → simulation + Braille display → GRBL over USB |
-| `palm_writer.py` | Engine: stroke font (37 glyphs), word/sentence cues, `Planner` (trapezoidal motion at 50 Hz), Braille Grade 1, G-code, CLI tools |
-| `haptic_box_v2.FCMacro` | Prototype CAD + clearance checks + STEP export + mesh export |
-| `render_views.py` | All the images in this document, rendered from the CAD meshes |
+| `haptic_app.py` | The ComLang companion app (Tkinter): listen/type → queue → simulation + Braille → GRBL. Speaker display, reset, mode, cover-material test |
+| `palm_writer.py` | Engine: stroke font, cues (tap, long tap), `Planner`, Braille Grade 1, G-code |
+| `haptic_box_v2.FCMacro` | Prototype CAD + clearance checks + STEP + mesh export |
+| `hand_model.py` | Hand + forearm model (3 sizes), control placement and reach maths, **glove outline** |
+| `cad_render.py` | Numpy renderer, also the app's live 3D view |
+| `render_views.py` | All the images in this document |
+| `start.sh` | One-command launcher |
 
 ### 7.2 Running
 
 ```
-python3 -m venv .venv && .venv/bin/pip install numpy vosk sounddevice pyserial
-.venv/bin/python haptic_app.py               # the app
-# first "Listen" downloads the small en-us model (~40 MB) to ~/.cache/vosk
+cd haptic-box
+./start.sh
 ```
 
-![app](renders/app_screenshot.png)
+This creates `.venv`, installs `numpy vosk sounddevice pyserial`, rebuilds `build/v2_mesh.json` with FreeCAD when the CAD changed, and starts the app. The first **Listen** downloads the small en-us model (~40 MB).
 
 **App controls.**
-- Keys: **Space** pause, **R** repeat word, **S** skip to the newest phrase, **C** clear, **L** listen, **+/−** speed.
-- Settings: speed 0.5–2×, letter height 30–60 mm, output (palm / Braille / both), speech model, box port with **Connect**, and "palm-down box (mirror)".
+
+| Action | App key / button | On the box |
+|---|---|---|
+| Pause / resume | Space | Press the thumb wheel |
+| Faster / slower | `+` / `−` | Roll the wheel away / in |
+| Repeat word | R | Repeat (little finger) |
+| Mode: palm + Braille → palm → Braille | M | Mode (free hand) |
+| **Reset** (speaker: output is wrong) | Esc, or the red button on the speaker display | Reset (speaker) |
+| Skip to the newest phrase / clear all | S / C | — |
+| Listen on/off | L | — |
+| **Speaker display** window | D | Built-in display |
+| **Cover-material test** (T13) | T | — |
+
+**Speaker display window.** Black, large type, for a second screen or a tablet turned to the speaker. It shows the word being written with the current letter highlighted, the recent transcript (dropped words struck through in red), mode / queue / paused, and big **Reset** and **Pause** buttons.
+
+**Live simulation.** The 3D tab renders the CAD model with the anatomical hand (small / medium / large). The gantry and pen move in real time, ink appears on the palm, and the thumb or little finger visibly presses the wheel or Repeat when those are used. Because the 3D view is built from the CAD meshes, CAD changes appear the next time `./start.sh` runs.
 
 ### 7.3 Text → touch rules
-- Only **finalised** recognition results are queued. Partial results are shown greyed and never written, because a letter on the palm can't be taken back.
-- Letters are written at the same spot, 45 mm tall. A 0.25 s pause separates letters. Between words: 1 tap at the centre + 0.6 s. `.` and `!` give 2 taps. Vosk outputs no punctuation, so these cues come from typed text only.
-- Braille: one cell per letter. A digit gets the number sign (⠼) only at the start of a run of digits.
+- Only **finalised** recognition results are queued. Partial results are shown greyed and never written.
+- Letters are written at the same spot, 45 mm tall, 0.25 s apart. Word gap: 1 tap + 0.6 s. `.` and `!`: 2 taps.
+- Braille: one cell per letter, shown **while the pen writes that letter** (D21). Digits: number sign at the start of a run.
+- **Touch cues (P15):**
+
+  | Event | Palm (pen) | Braille cells |
+  |---|---|---|
+  | Word gap | 1 tap | — |
+  | Sentence end (typed `.` `!`) | 2 taps | — |
+  | **Reset / correction** | 3 quick taps | 2 flashes (all dots up 0.5 s) |
+  | **Mode changed** | 0.6 s long press (if the pen is now on) | 1 flash (if the cells are now on) |
+
+- **Reset** stops the pen at once (GRBL soft reset + `M5`), drops the current and queued words, shows them struck through on the speaker display, and sends the correction cue.
 
 ### 7.4 To implement before user trials (MVP-1 gate)
 
-1. **Hand-present interlock in the app.** The Pico sends F9 down/up. With no hand: feed hold (`!`) + `M5`; resume (`~`) only after the hand returns and the user presses Pause/Resume.
-2. **Calibration screen.** Jog, set zero (`G10 L20 P1 X0 Y0`), and a test letter (§9).
-3. **Braille driver output** (phase 2): send the cell dot patterns to the driver board.
-4. **Hold-current change** after pull-in (`S400`) in `event_gcode`.
+1. **Hand-present interlock.** Pico sends F9 down/up. With no hand: feed hold (`!`) + `M5`; resume only after the hand returns and the user presses the wheel.
+2. **Calibration screen.** Jog, set zero, test letter (§9).
+3. **Box display link.** The app sends the speaker-display content to the Pico over USB CDC, one line per message, UTF-8:
+   - `W <word> <index of current letter>`
+   - `T <recent transcript, cancelled words prefixed with ~>`
+   - `S <mode>|<waiting>|<paused 0/1>`
+
+   The Pico firmware (CircuitPython, `usb_cdc` + `usb_hid` + `displayio`) draws them rotated 180°. The app's speaker window already renders the same content (`App._render_speaker`); the link only needs the serial sender.
+4. **Pico firmware** for the encoder (`+`/`−` per detent, Space on press) and the switches.
+5. **Braille driver output** (phase 2).
+6. **Hold-current change** after pull-in (`S400`).
+
+### 7.5 Cover-material test (supports D15 / T13)
+
+**Cover test** (key T) runs the recognition experiment:
+1. Enter the participant, cover material (list of candidates, editable), pen tip, force and letters per block.
+2. **Start block.** The app switches to palm-only mode and writes random letters one at a time. Letter size and speed come from the main window.
+3. After each letter, the operator types what the participant reports (`?` = don't know) and presses Enter. **Repeat letter** writes it again.
+
+Every answer is appended to `trials/cover_trials.csv`: time, participant, cover, tip, force, letter size, speed, target, response, correct, response time. The window shows accuracy per material so far.
 
 ---
 
 ## 8. Build guide (MVP-1)
 
-1. **Cut the plates.** P01 (tray parts), P02 and P03 from the DXF exported from the CAD (FreeCAD: select the face → Draft → Shape2DView → export DXF). Check the window, button and pin hole positions against §4.1.
-2. **Print** P10–P17 in PETG (0.2 mm layers, 4 walls, 40 % infill). Press in the bushings, then ream them to slide freely on the rods.
-3. **Assemble the base tray.** Glue the walls to the floor and check it is flat and square (diagonals within 0.5 mm). Fit the rubber feet.
-4. **Mount the rails.** Screw the pillars to the floor at the §4.3 positions. Insert the y-rails at z 34 and the x-rails at z 48, and check they are parallel (±0.2 mm along the length).
-5. **Fit the bars.** Slide the end blocks onto the rails. Fit the Y-bar and X-bar through the carriage, and check that the carriage moves freely over the whole 70 × 70 mm range.
-6. **Drives.** Mount the steppers, sync shafts (625ZZ blocks), pulleys and idlers. Clamp the belts into the tabs **with both ends of each bar at the same position** (square the bar against the pillars first). Then tension the belts.
-7. **Pen.** Mount the solenoid on the carriage bracket. Fit the pen, sleeve and force spring, starting with tip T10.
-8. **Electronics.** Mount the Uno + shield, MOSFET, Pico and TTP223 on standoffs in the front bay. Wire per §5.2. Set the TMC2209 Vref.
-9. **Flash and configure** GRBL (§6). Home it (`$H`), then jog to confirm the directions.
-10. **Top plate.** Laminate P03 on P02. Fit the buttons and the brass pad. Screw the plate down. The pen must pass through the window with ≥ 2 mm clearance at every corner of the workspace.
-11. **App.** Connect, run calibration (§9), then write test letters.
+1. **Cut the plates.** F01, F02, F03 from DXF exported from the CAD. Check the window, cover pocket, wheel slot, holes and pockets against §4.1.
+2. **Print** bearing blocks, end blocks, carriage, motor mounts, caps and the wheel. Press in the bushings and ream them to slide freely.
+3. **Assemble the base tray.** Flat and square (diagonals within 0.5 mm). Feet.
+4. **Shafts.** Mount the bearing blocks and posts. Fit the y-shafts (z 13) and x-shafts (z 29) with their belt pulleys (loose grub screws). Each shaft must turn freely.
+5. **Bars.** Slide the end blocks onto the shafts, fit the Y-bar and X-bar through the carriage. The carriage must move freely over the 70 × 70 mm range.
+6. **Belts.** Clamp each belt into its tab with **both ends of each bar at the same position** (square the bar first), then tighten the pulley grub screws. Tension.
+7. **Motors.** Mount on slotted mounts, fit the short belts, tension.
+8. **Pen head.** Fit the solenoid, wedge, roller, pen and force spring (start with tip T10). Check the 7 mm lift.
+9. **Electronics.** Uno + shield, MOSFET, Pi (later), Pico at the rear, encoder and switch boards under F02, display in its pocket. Wire per §5.2. Set the TMC2209 Vref.
+10. **Flash and configure** GRBL (§6). Home, jog, confirm directions.
+11. **Top plate.** Laminate F03 on F02, round the well edge, fit the caps and wheel (each returns freely), inlay the pad, screw down. The pen must clear the window by ≥ 2 mm at every corner.
+12. **Cover.** Make one cassette per test material. Drop one in: flush with the floor, < 3 mm sag under a resting palm.
+13. **App.** Connect, calibrate (§9), write test letters.
 
 ---
 
 ## 9. Calibration
 
 1. **Home** with `$H`.
-2. **Zero:** jog the pen (retracted) under the window centre; a cross on masking tape over the window helps. Then send `G10 L20 P1 X0 Y0`.
-3. **Height and force:**
-   1. With `M3 S1000`, the tip must stand **1.5 ± 0.3 mm above the recess floor**. Adjust with the sleeve or shims.
-   2. Measure the force: put a pocket scale, upside down, on spacers over the window. Target **40–80 g (0.4–0.8 N)**.
-   3. Adjust the spring preload with shims.
-4. **Orientation (P1):** with a person's hand on the box, write `L`, `F` and `R`. The person reports which way each letter faces. Set "palm-down box (mirror)" to match, or set `$3`.
-5. **Workspace:** run `G0` to the four corners (±35, ±35). There must be no contact with the window edge.
+2. **Zero:** jog the pen (retracted) under the window centre (cross on masking tape), then `G10 L20 P1 X0 Y0`.
+3. **Height and force, with the cover fitted:**
+   1. With `M3 S1000`, the tip must lift the membrane **1.5 ± 0.3 mm** above the floor.
+   2. Measure the force with a pocket scale over the cover. Target **40–80 g**.
+   3. Shim the spring.
+4. **Orientation (P1):** write `L`, `F`, `R` on a person's palm. Set "palm-down box (mirror)" to match.
+5. **Workspace:** `G0` to the four corners (±35, ±35). No contact with the window edge or the cassette frame.
 
 ---
 
@@ -416,16 +541,43 @@ python3 -m venv .venv && .venv/bin/pip install numpy vosk sounddevice pyserial
 
 | ID | Test | Pass criterion |
 |---|---|---|
-| T1 | CAD clearance: `freecadcmd haptic_box_v2.FCMacro` | Prints `CLEARANCES OK`. Pen tip +1.5 down / −6.0 up |
-| T2 | Repeatability: draw a 40 mm square 20× on paper taped over the window (pencil tip) | Line width spread ≤ 0.6 mm |
-| T3 | Speed: write the pangram (`palm_writer.py --check`) | ≥ 25 letters/min with no lost steps (square still closes afterwards) |
-| T4 | Pen timing: high-speed phone video of 20 taps | Up and down ≤ 50 ms each |
-| T5 | Interlock: lift the hand mid-letter | Pen retracts and motion stops within 100 ms |
-| T6 | Tip/force comfort (P2): 3 tips × 3 forces, 5 participants, 5 min each | Choose the combination with the best clarity and no discomfort |
-| T7 | Orientation (P1): 10 asymmetric letters, mirrored vs not | Choose the version with the higher recognition rate |
-| T8 | Recognition: 26 letters in random order, sizes 35/45/55 mm | ≥ 80 % recognition after a 10 min familiarisation (first target) |
-| T9 | Session comfort: 20 min continuous use | No wrist or forearm discomfort with the forearm pad |
-| T10 | End-to-end: a person speaks 5 sentences | Every finalised phrase is written. Queue, repeat and skip behave as specified |
+| T1 | CAD checks: `freecadcmd haptic_box_v2.FCMacro` | Prints `CLEARANCES OK` and `HAND FIT OK`. Pen tip +1.5 down / −5.5 up |
+| T2 | Repeatability: 40 mm square 20× on paper over the window | Line width spread ≤ 0.6 mm |
+| T3 | Speed: write the pangram | ≥ 25 letters/min, no lost steps |
+| T4 | Pen timing: high-speed video of 20 taps | Up and down ≤ 50 ms each |
+| T5 | Interlock: lift the hand mid-letter | Pen retracts, motion stops within 100 ms |
+| T6 | Tip/force comfort (P2): 3 tips × 3 forces, 5 participants | Best clarity, no discomfort |
+| T7 | Orientation (P1): 10 asymmetric letters, mirrored vs not | Higher recognition wins |
+| T8 | Recognition: 26 letters, sizes 35/45/55 mm | ≥ 80 % after 10 min familiarisation |
+| T9 | Session comfort: 20 min | No wrist or forearm discomfort |
+| T10 | End-to-end: 5 spoken sentences | Every final phrase written; queue, repeat, skip, reset behave as specified |
+| T11 | Control reach: ≥ 6 participants, small to large hands, eyes closed | Wheel roll, wheel press and Repeat each done within 3 s without lifting the palm. Mode found with the free hand within 5 s. No accidental presses in a 5 min writing session |
+| T12 | Braille slider: small and large hands | Cells under both pads |
+| **T13** | **Cover material experiment** (D15). See below | Choose the material |
+| T14 | Speaker display: read from the speaker's seat (1–1.5 m, across the table) | Current word readable at a glance; Reset understood without instruction |
+| T15 | Tactile symbols (P11): blindfolded participants identify each control by touch, raised vs etched versions | ≥ 95 % correct; choose raised or etched |
+| T16 | Glove fit: ≥ 10 participants of varied hand size and shape place the hand without guidance | Hand settles in the well within 5 s; no pressure points at the edges |
+
+**T13 Cover material experiment.**
+- **Candidates:**
+  - no cover (baseline only, without people at risk: the operator's own hand)
+  - nitrile glove film ~0.1 mm
+  - latex sheet 0.2 mm
+  - silicone sheet 0.5 mm
+  - TPU film 0.1 mm
+  - PET film 0.05 mm
+  - Lycra/elastane fabric
+  - PTFE film 0.1 mm
+
+  Make one cassette per material, with equal pre-tension.
+- **Design:** within-subject. Each participant does one block of 20 random letters per material (app: Cover test), in a counterbalanced (Latin-square) order. Pen tips T05 and T10 at 0.6 N. 45 mm letters, 1.0× speed. ≥ 5 participants (sighted-hearing blindfolded first, then deafblind users with their organisation).
+- **Measures:**
+  - recognition % (from the CSV) and response time
+  - confusion pairs
+  - comfort and "sharpness" ratings (1–5)
+  - after the block: membrane sag under a resting palm (< 3 mm), visible wear
+  - bench durability: 10 000 letters, no puncture.
+- **Choose** the material whose recognition is within 10 percentage points of the open window, with no discomfort and no puncture. If two qualify, choose the easier to clean.
 
 Run trials with deafblind people **together with their organisations or interpreters**. Get informed consent in an accessible format.
 
@@ -435,43 +587,55 @@ Run trials with deafblind people **together with their organisations or interpre
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **MVP-0: bench rig** | Gantry + pen on an open baseboard (no top plate). App + GRBL. Writes on paper and on a hand held over it | T2, T3, T4 pass |
-| **MVP-1: first box** *(the prototype in the CAD)* | Base tray, 2-layer top plate with recess and window, forearm pad, 3 buttons via Pico, hand-present pad, laptop app, USB mic. Braille on screen only | T1–T10 run with ≥ 5 participants. Decide P1, P2, P4, P5 |
-| **Phase 2: standalone** | Raspberry Pi 5 inside, piezo Braille cells, power button, enclosure finish (printed/moulded tray), left-hand plate | Usable without a screen. Braille synchronised with the pen |
+| **MVP-0: bench rig** | Gantry + pen on an open baseboard. App + GRBL. Writes on paper and through cover samples | T2, T3, T4 pass. First T13 pass (bench) |
+| **MVP-1: first box** *(the CAD)* | Thin base, 2-layer top plate with glove well, cover cassettes, forearm pad, thumb wheel / Repeat / Mode / Reset via Pico, hand-present pad, speaker display, laptop app, USB mic. Braille on screen only (P9) | T1–T16 with ≥ 5 participants. Decide P1, P2, P5, P11, cover material |
+| **Phase 2: standalone** | Raspberry Pi 5 inside, piezo Braille cells, power button, enclosure finish, left-hand plate | Usable without a laptop. Braille synchronised with the pen |
 
 ## 12. Risks
 
 | ID | Risk | Mitigation |
 |---|---|---|
-| R1 | **Throughput:** speech ~150 words/min vs palm ~6 words/min | Turn-taking indicator for the speaker. Skip-to-newest. Braille-only mode (faster). Optional opt-in summarising (open question 3) |
-| R2 | A pointed tip feels sharp | Spring-limited force, interchangeable tips, test T6 |
-| R3 | Fingers or objects in the open window | Hand-present interlock, low motor current, optional membrane (P4) |
-| R4 | A bar racks (skews) if the belt ends are clamped unevenly | Both ends belt-driven from one sync shaft. Square the bar at assembly (§8.6) |
-| R5 | Solenoid heat and noise | Hold current S400. A felt washer at the end stop |
-| R6 | Speech errors write wrong words | Final-only results. Repeat/skip controls. Larger Vosk model on the Pi |
-| R7 | The GRBL spindle pin mix-up (D11 vs the D12 shield label) | Wire by GRBL 1.1 pin number (§5.2) |
-| R8 | Braille cell cost and availability | Phase 2. Keep a screen-Braille fallback |
+| R1 | **Throughput:** speech ~150 words/min vs palm ~6 words/min | Speaker display shows how far behind it is. Skip, Reset, Braille-only mode, optional summarising (open question 2) |
+| R2 | A pointed tip feels sharp | Spring-limited force, interchangeable tips, the cover spreads the point. T6, T13 |
+| R3 | **The cover dulls the letters** | T13 picks the thinnest material that still protects. Larger letters (P5). Fallback: open window + interlock (v0.2) for trained users only |
+| R4 | The membrane wears through or sags onto the pen | Replaceable cassette, durability test, sag < 3 mm check at every cassette change |
+| R5 | A bar racks if the belt ends are clamped unevenly | Both ends driven from one shaft. Square at assembly (§8.6) |
+| R6 | Bushings sliding on rotating shafts wear or squeak | Self-aligning sintered bronze, light oil; the gantry is lightly loaded |
+| R7 | Flat solenoid too weak at full stroke | The wedge puts the high-force (closed) end at pen-down. Choose the solenoid by its force at 1–2 mm from closed. Fallback: two solenoids or a steeper wedge |
+| R8 | Speech errors write wrong words | Final-only results. Speaker display + Reset + correction cue. Larger Vosk model on the Pi |
+| R9 | Accidental Mode or Reset presses | Pocket buttons, top 1 mm below the surface. Reset is on the speaker side |
+| R10 | GRBL spindle pin mix-up | Wire by pin number (§5.2) |
+| R11 | Braille cell cost | Phase 2. Screen-Braille fallback |
 
 ---
 
-## Appendix A: v0.1 (superseded)
+## Appendix A: earlier versions (superseded)
 
-v0.1 had the hand inserted palm up into an enclosed box, written on from above by a stylus on a 5-bar linkage with a hinged lift deck (`haptic_box.FCMacro`, `palm_writer.py --check`). It was replaced because the review chose:
-- an open top with the palm down
-- a pen from below
-- one-plane XY motion
-- buttons and Braille around the hand.
+**v0.2** (Nov 2026) was 80 mm tall:
+- crossed rails at z 34 / 48, driven by sync shafts in a separate layer at z 21
+- an upright Ø16 × 32 solenoid
+- an open window (no cover)
+- a well made from the union of three handprints
+- Braille-labelled Pause (thumb) and Repeat (little finger) caps, plus a flush Speed bar under the ring fingertip.
 
-The v0.1 files stay in the repo for reference. Its kinematics check still runs.
+Review 2 asked for a thinner box, a cover, a glove print, speed up/down controls, symbols, mode switching and a speaker display. The pitch added the thumb wheel and synchronised Braille. That led to v0.3.
+
+**v0.1** had the hand inserted palm up into an enclosed box, written on from above by a 5-bar linkage (`haptic_box.FCMacro`). It stays in the repo for reference.
 
 ## Appendix B: Regenerating the CAD and images
 
 ```
 cd haptic-box
-HAPTIC_DUMP=build/v2_mesh.json freecadcmd haptic_box_v2.FCMacro   # checks, .FCStd, .step, meshes
+HAPTIC_DUMP=build/v2_mesh.json freecadcmd haptic_box_v2.FCMacro   # checks, .FCStd, .step, meshes (~30 s)
 python3 render_views.py                                           # all renders → renders/
-python3 render_views.py top section detail                        # selected views
+python3 render_views.py top section symbols                       # selected views
 freecad haptic_box_v2.FCMacro                                     # interactive 3D, animates TEXT
 ```
 
-All dimensions are parameters at the top of `haptic_box_v2.FCMacro`, for example `BOX_W/L/H`, `WINDOW`, `PEN_PRESS`, `HAND`, `Z_YBAR/Z_XBAR`. After changing any of them, re-run both commands and update §4.1 and §4.3.
+All dimensions are parameters at the top of `haptic_box_v2.FCMacro`. For example:
+- `BOX_W/L`, `PLATE_UNDER`, `BASE_T`, `RECESS`
+- `GLOVE_MARGIN`, `COVER`, `COVER_T`
+- `WHEEL_R/W/UP`, `STRIP`, `SPEAKER`, `DISPLAY`
+- `SYMBOL_RELIEF`, `Z_YRAIL/Z_XRAIL/Z_YBAR/Z_XBAR`, `BELT_X_THUMB/LITTLE`, `HAND`
+
+The box height follows from them: `BOX_H = PLATE_UNDER + BASE_T + RECESS`. After changing any of them, re-run both commands and update §4.1 and §4.3.
