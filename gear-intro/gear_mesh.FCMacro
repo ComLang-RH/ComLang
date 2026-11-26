@@ -1,0 +1,165 @@
+# -*- coding: utf-8 -*-
+"""FreeCAD macro: 20T / 40T involute spur gear pair, animated.
+
+GUI:       freecad gear_mesh.FCMacro          (or Macro > Macros... > Execute)
+           Stop with:  stop_gears()  in the Python console, or re-run the macro.
+Headless:  freecadcmd gear_mesh.FCMacro       (interference check + saves gear_mesh.FCStd)
+
+No add-on workbenches required.
+"""
+import math, os, time
+import FreeCAD as App
+import Part
+from FreeCAD import Vector, Placement, Rotation
+
+# ---------------- parameters ----------------
+MODULE = 2.0          # mm
+PRESSURE_ANGLE = 20.0 # deg
+N1, N2 = 20, 40       # tooth counts
+FACE_WIDTH = 10.0     # mm
+BACKLASH = 0.05       # mm (total, along pitch circle)
+RPM1 = 30.0           # driver speed
+# --------------------------------------------
+
+ALPHA = math.radians(PRESSURE_ANGLE)
+RATIO = N2 / N1
+CENTER_DIST = MODULE * (N1 + N2) / 2.0       # 60 mm
+PHASE2 = 180.0 / N2                           # deg: tooth gap of gear 2 faces tooth 0 of gear 1
+
+
+def inv(a):
+    return math.tan(a) - a
+
+
+def gear_solid(n, bore_r, marker_r, pts=16):
+    rp = MODULE * n / 2.0
+    rb = rp * math.cos(ALPHA)
+    ra = rp + MODULE
+    rf = rp - 1.25 * MODULE
+    half_tooth = math.pi / (2 * n) - (BACKLASH / 4.0) / rp
+
+    def half_angle(r):
+        return half_tooth + inv(ALPHA) - inv(math.acos(rb / r))
+
+    r0 = max(rb, rf)
+    radii = [r0 + (ra - r0) * i / (pts - 1) for i in range(pts)]
+    flank = [(r, half_angle(r)) for r in radii]
+    if rf < rb:
+        flank.insert(0, (rf, flank[0][1]))
+
+    pitch = 2 * math.pi / n
+    poly = []
+    for i in range(n):
+        c = i * pitch
+        poly += [(r, c - a) for r, a in flank]                       # right flank up
+        ta = flank[-1][1]
+        poly += [(ra, c - ta + 2 * ta * k / 4) for k in range(1, 4)]  # tip land
+        poly += [(r, c + a) for r, a in reversed(flank)]             # left flank down
+        a0 = c + flank[0][1]
+        a1 = c + pitch - flank[0][1]
+        poly += [(rf, a0 + (a1 - a0) * k / 5) for k in range(1, 5)]  # root arc
+    vecs = [Vector(r * math.cos(a), r * math.sin(a), 0) for r, a in poly]
+    vecs.append(vecs[0])
+    face = Part.Face(Part.makePolygon(vecs))
+    solid = face.extrude(Vector(0, 0, FACE_WIDTH))
+    solid = solid.cut(Part.makeCylinder(bore_r, FACE_WIDTH))
+    # off-centre hole so the rotation is easy to see
+    solid = solid.cut(Part.makeCylinder(marker_r, FACE_WIDTH, Vector(rf * 0.6, 0, 0)))
+    return solid, rp
+
+
+def placement(x, deg):
+    return Placement(Vector(x, 0, 0), Rotation(Vector(0, 0, 1), deg))
+
+
+def build(doc):
+    s1, rp1 = gear_solid(N1, 4.0, 2.0)
+    s2, rp2 = gear_solid(N2, 6.0, 3.0)
+    g1 = doc.addObject("Part::Feature", "Gear_%dT" % N1)
+    g1.Shape = s1
+    g2 = doc.addObject("Part::Feature", "Gear_%dT" % N2)
+    g2.Shape = s2
+    g1.Placement = placement(0, 0)
+    g2.Placement = placement(CENTER_DIST, PHASE2)
+    for r, x, name in ((rp1, 0, "PitchCircle_1"), (rp2, CENTER_DIST, "PitchCircle_2")):
+        pc = doc.addObject("Part::Feature", name)
+        pc.Shape = Part.makeCircle(r, Vector(x, 0, FACE_WIDTH + 0.1))
+    doc.recompute()
+    return g1, g2
+
+
+def set_angle(g1, g2, th1_deg):
+    g1.Placement = placement(0, th1_deg)
+    g2.Placement = placement(CENTER_DIST, PHASE2 - th1_deg / RATIO)
+
+
+def interference_check(g1, g2, steps=24):
+    """Rotate through one tooth pitch of gear 1 and measure overlap volume."""
+    worst = 0.0
+    pitch_deg = 360.0 / N1
+    for k in range(steps):
+        set_angle(g1, g2, pitch_deg * k / steps)
+        a = g1.Shape.copy()
+        a.Placement = g1.Placement
+        b = g2.Shape.copy()
+        b.Placement = g2.Placement
+        worst = max(worst, a.common(b).Volume)
+    set_angle(g1, g2, 0)
+    return worst
+
+
+# ------------------------------------------------------------------
+doc = App.newDocument("GearMesh")
+G1, G2 = build(doc)
+
+if App.GuiUp:
+    import FreeCADGui as Gui
+    from PySide import QtCore
+
+    for obj, col in ((G1, (0.30, 0.47, 0.66)), (G2, (0.96, 0.52, 0.09))):
+        obj.ViewObject.ShapeColor = col
+    for name in ("PitchCircle_1", "PitchCircle_2"):
+        v = doc.getObject(name).ViewObject
+        v.LineColor = (0.2, 0.2, 0.2)
+        v.DrawStyle = "Dashed"
+
+    view = Gui.activeDocument().activeView()
+    view.viewTop()
+    Gui.SendMsgToActiveView("ViewFit")
+
+    # stop a previous run's timer if the macro is executed again
+    old = getattr(App, "_gear_timer", None)
+    if old is not None:
+        old.stop()
+
+    t0 = time.monotonic()
+    omega1 = RPM1 * 6.0   # deg/s
+
+    def _tick():
+        try:
+            set_angle(G1, G2, omega1 * (time.monotonic() - t0))
+            Gui.updateGui()
+        except Exception:      # document closed -> stop animating
+            App._gear_timer.stop()
+
+    timer = QtCore.QTimer()
+    timer.timeout.connect(_tick)
+    timer.start(20)
+    App._gear_timer = timer
+
+    def stop_gears():
+        App._gear_timer.stop()
+
+    import __main__
+    __main__.stop_gears = stop_gears
+    App.Console.PrintMessage(
+        "Gears running: %dT @ %.0f rpm drives %dT @ %.1f rpm. Type stop_gears() to stop.\n"
+        % (N1, RPM1, N2, RPM1 / RATIO))
+else:
+    vol = interference_check(G1, G2)
+    print("Center distance: %.2f mm, ratio %.1f:1" % (CENTER_DIST, RATIO))
+    print("Max overlap volume over one tooth pitch: %.6f mm^3" % vol)
+    print("MESH OK" if vol < 1e-3 else "INTERFERENCE DETECTED")
+    out = os.path.join(os.getcwd(), "gear_mesh.FCStd")
+    doc.saveAs(out)
+    print("Saved", out)

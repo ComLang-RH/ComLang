@@ -1,0 +1,418 @@
+# -*- coding: utf-8 -*-
+"""FreeCAD macro: haptic print-on-palm box (concept assembly), parametric.
+
+The user slides one hand, palm up, through the front port. A stylus driven by a
+5-bar linkage writes block capitals on the palm, one on top of the other
+(print-on-palm), from speech that has been recognised to text.
+
+GUI:       freecad haptic_box.FCMacro      (animates the linkage writing TEXT)
+           stop with  stop_writer()  in the Python console.
+Headless:  freecadcmd haptic_box.FCMacro   (clearance checks + saves haptic_box.FCStd)
+
+Frame: x across the box (+x = user's right), y into the box from the inside face
+of the front wall, z up from the inner floor. Units mm.
+Needs palm_writer.py in the same folder (kinematics + stroke font).
+"""
+import math, os, sys, time
+import FreeCAD as App
+import Part
+from FreeCAD import Vector, Placement, Rotation
+
+# ---------------- parameters ----------------
+HAND = "right"            # "right" or "left": mirrors thumb locator & dummy hand
+WALL = 4.0
+IW, IL, IH = 200.0, 280.0, 185.0      # inner width, length, height (to lid)
+PORT_W, PORT_H, PORT_Z, PORT_R = 130.0, 85.0, 15.0, 20.0
+REST_TOP = 15.0           # forearm rest top (= port sill)
+CRADLE_TOP = 26.0         # back of hand rests here
+HAND_THICK = 32.0         # back-of-hand to palm surface (50th pct adult ~30-35)
+WRIST_Y = 75.0            # wrist crease position
+PALM_Y = WRIST_Y + 55.0   # centre of writing area
+PALM_Z = CRADLE_TOP + HAND_THICK
+GUARD_Z = 108.0           # underside of guard plate (finger/link separation)
+GUARD_T = 3.0
+WINDOW = 84.0             # guard-plate window (workspace 70 + stylus 6 + margin)
+DECK_Z = 130.0            # underside of the hinged linkage deck
+DECK_T = 4.0
+HINGE_Y = 272.0
+LINK_W, LINK_T = 8.0, 3.0
+STYLUS_R, TIP_R = 3.0, 4.0
+TEXT = "HELLO."           # what the GUI animation writes
+# --------------------------------------------
+
+try:
+    HERE = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    HERE = os.getcwd()
+sys.path.insert(0, HERE)
+import palm_writer as pw  # noqa: E402
+
+SIDE = 1.0 if HAND == "right" else -1.0
+SERVO = (20.0, 34.0, 26.0)            # Dynamixel XL330 body (W, D, H)
+Z_LINKS = {"distR": GUARD_Z + GUARD_T + 3, "distL": GUARD_Z + GUARD_T + 7,
+           "prox": GUARD_Z + GUARD_T + 12}
+
+
+def V(x, y, z=0.0):
+    return Vector(x, y, z)
+
+
+def rbox(w, l, h, r, x, y, z):
+    """Box with vertical edges rounded by r, min corner at (x, y, z)."""
+    b = Part.makeBox(w, l, h, V(x, y, z))
+    return b.makeFillet(r, [e for e in b.Edges if abs(e.tangentAt(0).z) > 0.99]) if r > 0 else b
+
+
+def bar(length, w=LINK_W, t=LINK_T):
+    """Link along +x from the origin with round ends (pivot centres at 0 and length)."""
+    s = Part.makeBox(length, w, t, V(0, -w / 2))
+    for x in (0, length):
+        s = s.fuse(Part.makeCylinder(w / 2, t, V(x, 0)))
+    for x in (0, length):
+        s = s.cut(Part.makeCylinder(1.5, t, V(x, 0)))
+    return s.removeSplitter()
+
+
+# ---------------- static parts ----------------
+def shell():
+    outer = Part.makeBox(IW + 2 * WALL, IL + 2 * WALL, IH + WALL, V(-IW / 2 - WALL, -WALL, -WALL))
+    inner = Part.makeBox(IW, IL, IH + 1, V(-IW / 2, 0, 0))
+    s = outer.cut(inner)
+    port = Part.makeBox(PORT_W, 3 * WALL, PORT_H, V(-PORT_W / 2, -2 * WALL, PORT_Z))
+    port = port.makeFillet(PORT_R, [e for e in port.Edges if abs(e.tangentAt(0).y) > 0.99])
+    s = s.cut(port)
+    for i in range(6):                                   # rear vents
+        s = s.cut(Part.makeBox(8, 3 * WALL, 40, V(-50 + i * 18, IL - WALL, 120)))
+    s = s.cut(Part.makeCylinder(6, 3 * WALL, V(70, IL - WALL, 150), V(0, 1, 0)))  # DC jack
+    return s
+
+
+def port_brush():
+    """Brush / foam surround: blocks light and gives a tactile entry guide."""
+    o = Part.makeBox(PORT_W + 20, 10, PORT_H + 20, V(-PORT_W / 2 - 10, -WALL - 10, PORT_Z - 10))
+    o = o.makeFillet(PORT_R + 8, [e for e in o.Edges if abs(e.tangentAt(0).y) > 0.99])
+    i = Part.makeBox(PORT_W - 8, 12, PORT_H - 8, V(-PORT_W / 2 + 4, -WALL - 11, PORT_Z + 4))
+    i = i.makeFillet(PORT_R - 4, [e for e in i.Edges if abs(e.tangentAt(0).y) > 0.99])
+    sill = Part.makeBox(PORT_W - 8, 12, 15, V(-PORT_W / 2 + 4, -WALL - 11, PORT_Z - 11))
+    return o.cut(i).cut(sill)          # U-shaped: no bristles on the sill the forearm slides on
+
+
+def forearm_rest():
+    r = Part.makeBox(110, WRIST_Y, REST_TOP, V(-55, 0, 0))
+    return r.cut(Part.makeCylinder(120, WRIST_Y, V(0, 0, REST_TOP + 116), V(0, 1, 0)))
+
+
+def cradle():
+    c = rbox(120, IL - WRIST_Y - 5, CRADLE_TOP, 10, -60, WRIST_Y, 0)
+    dish = Part.makeSphere(1.0)                          # shallow dish under the knuckles
+    m = App.Matrix()
+    m.scale(70, 110, 30)
+    dish = dish.transformGeometry(m)
+    dish.translate(V(0, PALM_Y + 20, CRADLE_TOP + 25))
+    return c.cut(dish)
+
+
+def thumb_post():
+    """Soft locator between thumb and index finger: registers the palm under the window."""
+    x = SIDE * 52
+    return Part.makeCylinder(6, 44, V(x, 172, CRADLE_TOP)).fuse(
+        Part.makeSphere(6, V(x, 172, CRADLE_TOP + 44)))
+
+
+def guard_plate():
+    g = Part.makeBox(IW, IL, GUARD_T, V(-IW / 2, 0, GUARD_Z))
+    w = rbox(WINDOW, WINDOW, GUARD_T + 2, 10, -WINDOW / 2, PALM_Y - WINDOW / 2, GUARD_Z - 1)
+    return g.cut(w)
+
+
+def hinge_blocks():
+    s = None
+    for x in (-72, 64):
+        b = Part.makeBox(8, 14, DECK_Z + DECK_T / 2 + 6 - GUARD_Z - GUARD_T,
+                         V(x, HINGE_Y - 7, GUARD_Z + GUARD_T))
+        s = b if s is None else s.fuse(b)
+    return s
+
+
+def electronics():
+    """Front-upper bay above the wrist: SBC, servo controller, ToF hand sensor."""
+    sbc = Part.makeBox(85, 56, 20, V(-92, 8, GUARD_Z + GUARD_T + 4))        # Raspberry Pi 5
+    ctl = Part.makeBox(55, 65, 15, V(8, 8, GUARD_Z + GUARD_T + 4))          # servo controller
+    tof = Part.makeBox(12, 10, 4, V(-6, PALM_Y - WINDOW / 2 - 14, GUARD_Z - 4))  # VL53L1X
+    return sbc, ctl, tof
+
+
+def lid():
+    l = Part.makeBox(IW + 2 * WALL, IL + 2 * WALL, WALL, V(-IW / 2 - WALL, -WALL, IH))
+    for i in range(5):                                    # mic grille
+        for j in range(5):
+            l = l.cut(Part.makeCylinder(1.5, 3 * WALL, V(-12 + 6 * i, 30 + 6 * j, IH - WALL)))
+    l = l.cut(Part.makeCylinder(2.5, 3 * WALL, V(0, 75, IH - WALL)))       # status LED
+    return l
+
+
+def buttons():
+    """Repeat / Pause / Speed for the free hand, on the side away from the writing hand."""
+    s = []
+    for k in range(3):
+        b = Part.makeCylinder(9, 6, V(-SIDE * 70, 20 + 24 * k, IH + WALL))
+        b = b.fuse(Part.makeSphere(2, V(-SIDE * 70, 20 + 24 * k, IH + WALL + 6 + 1.2)))
+        s.append(b)
+    return s
+
+
+def mic():
+    return Part.makeCylinder(33, 8, V(0, 42, IH - 8))                       # 4-mic array
+
+
+def hand_dummy():
+    """Very rough 50th-95th pct adult hand, palm up (collision envelope only)."""
+    z0 = CRADLE_TOP
+    palm = rbox(90, 105, HAND_THICK, 12, -45, WRIST_Y, z0)
+    fingers = [(-30, 60), (-10, 75), (10, 80), (30, 72)]               # little..index (right hand)
+    for fx, fl in fingers:
+        palm = palm.fuse(Part.makeCylinder(9, fl, V(SIDE * fx, WRIST_Y + 105, z0 + 12), V(0, 1, 0)))
+    d = V(SIDE * 0.6, 0.8, 0)
+    palm = palm.fuse(Part.makeCylinder(11, 60, V(SIDE * 40, WRIST_Y + 35, z0 + 16), d))
+    arm = Part.makeCylinder(32, WRIST_Y + 160, V(0, -160, REST_TOP + 32), V(0, 1, 0))
+    arm = arm.cut(Part.makeBox(200, 400, 200, V(-100, WRIST_Y + 5, -50)))
+    return palm.removeSplitter(), arm
+
+
+# ---------------- moving parts (5-bar on a hinged deck) ----------------
+def deck_shape():
+    d = Part.makeBox(130, HINGE_Y - 180, DECK_T, V(-65, 180, DECK_Z))
+    for s in (-1, 1):
+        d = d.cut(Part.makeCylinder(4, DECK_T, V(s * pw.LINK_A, PALM_Y + pw.LINK_D, DECK_Z)))
+    return d.fuse(Part.makeCylinder(4, 128, V(-64, HINGE_Y, DECK_Z + DECK_T / 2), V(1, 0, 0)))
+
+
+def servo_shapes():
+    w, d, h = SERVO
+    out = []
+    for s in (-1, 1):
+        bx, by = s * pw.LINK_A, PALM_Y + pw.LINK_D
+        body = Part.makeBox(w, d, h, V(bx - w / 2, by - 9, DECK_Z + DECK_T))
+        shaft = Part.makeCylinder(3, DECK_T + 4, V(bx, by, DECK_Z - 4))
+        out.append(body.fuse(shaft))
+    return out
+
+
+def stylus_shapes():
+    carrier = Part.makeCylinder(5, Z_LINKS["distL"] + LINK_T - Z_LINKS["distR"] + 2,
+                                V(0, 0, Z_LINKS["distR"] - 1))
+    rod_bot = PALM_Z + TIP_R
+    rod = Part.makeCylinder(STYLUS_R, Z_LINKS["distR"] - 1 - rod_bot, V(0, 0, rod_bot))
+    tip = Part.makeSphere(TIP_R, V(0, 0, PALM_Z + TIP_R))   # soft silicone ball, spring-loaded
+    vib = Part.makeCylinder(5, 3, V(0, 0, Z_LINKS["distL"] + LINK_T + 1))  # coin LRA for cues
+    return carrier.fuse(vib), rod, tip
+
+
+def lift_servo():
+    """Z servo on a side-wall bracket above the deck; its horn presses a tab on the deck
+    front down against a lift spring (power off -> spring lifts the pen = fail safe)."""
+    w, d, h = SERVO
+    z = DECK_Z + DECK_T + 4
+    body = Part.makeBox(h, d, w, V(70, 182, z))
+    bracket = Part.makeBox(IW / 2 - 70 - h, d, 4, V(70 + h, 182, z - 4))
+    return body.fuse(bracket)
+
+
+def hinge_placement(lift, py=0.0):
+    ang = math.degrees(math.atan2(lift, HINGE_Y - (PALM_Y + py)))   # exact lift at the stylus
+    return Placement(V(0, 0, 0), Rotation(V(1, 0, 0), -ang), V(0, HINGE_Y, DECK_Z + DECK_T / 2))
+
+
+def arm_poses(px, py):
+    """Link placements (before deck tilt) for stylus at palm coords (px, py)."""
+    p = (px, py)
+    out = {}
+    for name, side in (("L", -1), ("R", 1)):
+        th, e = pw.ik(p, side)
+        b = pw.base(side)
+        out["prox" + name] = Placement(V(b[0], PALM_Y + b[1], Z_LINKS["prox"]),
+                                       Rotation(V(0, 0, 1), math.degrees(th)))
+        ad = math.degrees(math.atan2(py - e[1], px - e[0]))
+        out["dist" + name] = Placement(V(e[0], PALM_Y + e[1], Z_LINKS["dist" + name]),
+                                       Rotation(V(0, 0, 1), ad))
+    out["stylus"] = Placement(V(px, PALM_Y + py, 0), Rotation())
+    return out
+
+
+# ---------------- build document ----------------
+doc = App.newDocument("HapticBox")
+
+
+def add(name, shape, col=None, alpha=0):
+    o = doc.addObject("Part::Feature", name)
+    o.Shape = shape
+    if App.GuiUp and col:
+        o.ViewObject.ShapeColor = col
+        o.ViewObject.Transparency = alpha
+    return o
+
+
+STATIC = {
+    "Shell": (shell(), (0.85, 0.85, 0.82), 70),
+    "PortBrush": (port_brush(), (0.15, 0.15, 0.15), 0),
+    "ForearmRest": (forearm_rest(), (0.35, 0.55, 0.75), 0),
+    "Cradle": (cradle(), (0.35, 0.55, 0.75), 0),
+    "ThumbPost": (thumb_post(), (0.95, 0.75, 0.2), 0),
+    "GuardPlate": (guard_plate(), (0.7, 0.85, 0.95), 50),
+    "HingeBlocks": (hinge_blocks(), (0.4, 0.4, 0.4), 0),
+    "LiftServo": (lift_servo(), (0.15, 0.15, 0.15), 0),
+    "Lid": (lid(), (0.85, 0.85, 0.82), 80),
+    "Mic": (mic(), (0.1, 0.4, 0.2), 0),
+}
+sbc, ctl, tof = electronics()
+STATIC.update({"SBC": (sbc, (0.1, 0.5, 0.2), 0), "ServoCtl": (ctl, (0.2, 0.2, 0.6), 0),
+               "ToFSensor": (tof, (0.6, 0.1, 0.1), 0)})
+for k, b in enumerate(buttons()):
+    STATIC["Button%d" % k] = (b, (0.9, 0.3, 0.1), 0)
+hand, arm = hand_dummy()
+STATIC.update({"HandDummy": (hand, (0.95, 0.8, 0.7), 40), "ForearmDummy": (arm, (0.95, 0.8, 0.7), 40)})
+objs = {k: add(k, *v) for k, v in STATIC.items()}
+
+BASE_SHAPES = {"Deck": deck_shape(), "ServoL": servo_shapes()[0], "ServoR": servo_shapes()[1],
+               "proxL": bar(pw.LINK_L1), "proxR": bar(pw.LINK_L1),
+               "distL": bar(pw.LINK_L2), "distR": bar(pw.LINK_L2)}
+car, rod, tip = stylus_shapes()
+BASE_SHAPES.update({"Carrier": car, "Stylus": rod, "Tip": tip})
+COLORS = {"Deck": (0.6, 0.6, 0.6), "ServoL": (0.15, 0.15, 0.15), "ServoR": (0.15, 0.15, 0.15),
+          "proxL": (0.29, 0.47, 0.66), "distL": (0.29, 0.47, 0.66),
+          "proxR": (0.95, 0.52, 0.1), "distR": (0.95, 0.52, 0.1),
+          "Carrier": (0.3, 0.3, 0.3), "Stylus": (0.3, 0.3, 0.3), "Tip": (0.75, 0.15, 0.15)}
+moving = {k: add(k, s, COLORS[k]) for k, s in BASE_SHAPES.items()}
+
+
+def set_pose(px, py, lift):
+    hp = hinge_placement(lift, py)
+    poses = arm_poses(px, py)
+    for k, o in moving.items():
+        if k in ("Carrier", "Stylus", "Tip"):
+            local = poses["stylus"]
+        elif k in poses:
+            local = poses[k]
+        else:
+            local = Placement()
+        o.Placement = hp.multiply(local)
+
+
+set_pose(0, 0, 0)
+doc.recompute()
+
+
+# ---------------- checks ----------------
+def overlap(a, b):
+    return a.common(b).Volume if a.BoundBox.intersect(b.BoundBox) else 0.0
+
+
+def run_checks():
+    ok = True
+
+    def report(name, vol, tol=1e-3):
+        nonlocal ok
+        bad = vol > tol
+        ok &= not bad
+        print("  %-46s %10.4f mm^3  %s" % (name, vol, "FAIL" if bad else "ok"))
+
+    S = {k: o.Shape.copy() for k, o in objs.items()}
+    hand_s = S["HandDummy"]
+    print("Static clearances:")
+    for k in ("Shell", "PortBrush", "GuardPlate", "SBC", "ServoCtl", "ToFSensor", "ThumbPost",
+              "LiftServo", "HingeBlocks"):
+        report("hand vs %s" % k, overlap(hand_s, S[k]))
+    for k in ("Shell", "PortBrush", "GuardPlate"):
+        report("forearm vs %s" % k, overlap(S["ForearmDummy"], S[k]))
+    print("  palm-to-guard clearance: %.1f mm" % (GUARD_Z - hand_s.BoundBox.ZMax))
+
+    print("Linkage sweep over the %.0f mm workspace (pen up and down):" % pw.WORKSPACE)
+    g = [-pw.WORKSPACE / 2 + pw.WORKSPACE * i / 6 for i in range(7)]
+    worst = {}
+    fixed = [k for k in S if k not in ("HandDummy", "ForearmDummy", "Lid", "Mic")]
+    for lift in (0.0, pw.PEN_LIFT):
+        for px in g:
+            for py in g:
+                set_pose(px, py, lift)
+                M = {k: o.Shape.copy() for k, o in moving.items()}
+                pairs = [("hand vs " + k, hand_s, M[k]) for k in M if k != "Tip"]
+                pairs += [("%s vs %s" % (m, f), M[m], S[f])
+                          for m in M for f in fixed if not (m == "Deck" and f == "HingeBlocks")]
+                pairs += [("proxL vs proxR", M["proxL"], M["proxR"]),
+                          ("distL vs distR", M["distL"], M["distR"]),
+                          ("proxL vs distL", M["proxL"], M["distL"]),
+                          ("proxR vs distR", M["proxR"], M["distR"])]
+                for name, a, b in pairs:
+                    worst[name] = max(worst.get(name, 0.0), overlap(a, b))
+                h = M["Tip"].BoundBox.ZMin - PALM_Z
+                if lift:
+                    worst["tip height above palm, pen up (min)"] = min(
+                        worst.get("tip height above palm, pen up (min)", 99.0), h)
+                else:
+                    worst["tip height above palm, pen down (max)"] = max(
+                        worst.get("tip height above palm, pen down (max)", -99.0), h)
+    for name, v in sorted(worst.items()):
+        if name.startswith("tip height"):
+            print("  %-46s %10.2f mm" % (name, v))
+        elif v > 1e-3 or name in ("hand vs Stylus", "Stylus vs GuardPlate", "distR vs GuardPlate",
+                                  "proxL vs distL", "distL vs distR"):
+            report(name, v)
+    print("  (%d part pairs checked at %d poses; only failures and key pairs listed)"
+          % (len(worst), 2 * len(g) ** 2))
+    set_pose(0, 0, 0)
+    bb = objs["Shell"].Shape.BoundBox
+    print("Outside size: %.0f W x %.0f L x %.0f H mm (+ port brush and buttons)"
+          % (bb.XLength, bb.YLength, bb.ZLength + WALL))
+    print("CLEARANCES OK" if ok else "INTERFERENCE DETECTED")
+    return ok
+
+
+if App.GuiUp:
+    import FreeCADGui as Gui
+    from PySide import QtCore
+
+    Gui.SendMsgToActiveView("ViewFit")
+    Gui.activeDocument().activeView().viewIsometric()
+    t, x, y, z, _ = pw.build_path(TEXT)
+    old = getattr(App, "_writer_timer", None)
+    if old is not None:
+        old.stop()
+    t0 = time.monotonic()
+
+    def _tick():
+        try:
+            i = int(((time.monotonic() - t0) / pw.DT) % len(t))
+            set_pose(x[i], y[i], z[i])
+            Gui.updateGui()
+        except Exception:
+            App._writer_timer.stop()
+
+    timer = QtCore.QTimer()
+    timer.timeout.connect(_tick)
+    timer.start(20)
+    App._writer_timer = timer
+
+    def stop_writer():
+        App._writer_timer.stop()
+
+    import __main__
+    __main__.stop_writer = stop_writer
+    App.Console.PrintMessage("Writing %r on the palm (%.1f s loop). stop_writer() to stop.\n"
+                             % (TEXT, t[-1]))
+else:
+    run_checks()
+    out = os.path.join(HERE, "haptic_box.FCStd")
+    doc.saveAs(out)
+    print("Saved", out)
+    dump = os.environ.get("HAPTIC_MESH_DUMP")
+    if dump:                                    # tessellate for an external preview render
+        import json
+        data = {}
+        for o in doc.Objects:
+            s = o.Shape.copy()
+            s.Placement = o.Placement
+            pts, tris = s.tessellate(1.0)
+            data[o.Name] = {"v": [[p.x, p.y, p.z] for p in pts], "f": [list(f) for f in tris]}
+        with open(dump, "w") as f:
+            json.dump(data, f)
+        print("Mesh dump", dump)
