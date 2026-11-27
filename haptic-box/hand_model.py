@@ -109,8 +109,8 @@ class Hand:
             tip = ch[0][3]
             y = min(max(tip[1], button["y"] - button["l"] / 2 + 4), button["y"] + button["l"] / 2 - 4)
             return (button["x"], y), self.palm_z - 1.0
-        if button.get("symbol") == "wheel":           # thumb pad on the crown of the wheel
-            return (button["x"], button["y"]), button["top"] - 1.0
+        if button.get("symbol") == "wheel":           # thumb pad on the crown of the roller; its
+            return (button["x"], button["y"]), button["top"] - 0.5   # press switch travels 0.5 mm
         bx, by = ch[0][0][0], ch[0][0][1]
         a = _unit(button["x"] - bx, button["y"] - by)
         inset = button["r"] - 5.0                     # land 5 mm inside the near edge

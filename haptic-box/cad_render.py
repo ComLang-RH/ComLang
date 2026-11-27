@@ -10,7 +10,7 @@ import os
 
 import numpy as np
 
-import palm_writer as pw
+from comlang import engine as pw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MESH = os.path.join(HERE, "build", "v2_mesh.json")
@@ -40,9 +40,9 @@ class Scene:
     def offsets(self, px, py, down):
         """Same mapping as haptic_box_v2.offsets(): palm coords -> part translations."""
         mx = -px
-        cx, cy = mx - self.p.get("PEN_DX", 16.0), py - self.p.get("PEN_DY", 16.0)
+        cx, cy = mx - self.p.get("PEN_DX", 0.0), py - self.p.get("PEN_DY", 0.0)
         dz = self.stroke * down
-        return {"YBar": (0, cy, 0), "XBar": (cx, 0, 0), "Carriage": (cx, cy, 0), "Pen": (cx, cy, dz)}
+        return {"Gantry": (0, cy, 0), "GantryBelts": (0, cy, 0), "Carriage": (cx, cy, 0), "Pen": (cx, cy, dz)}
 
     def objects(self, pose=(0, 0, 0), hide=(), alpha=None, color=None, hand="medium", hand_pose="rest"):
         """[(name, V, F, rgb, alpha)] for the given pen pose (palm x, y, down 0..1), with the
@@ -173,6 +173,15 @@ def raster(cam, buf, V, F, rgb, oid, clip=None, depth_only=None):
         buf.n[sl][m] = nn[i] if not cut else -cam.c
 
 
+def outline(c):
+    """Edge colour: darker on light surfaces, lighter on dark ones (the black shell keeps its shape)."""
+    lum = c @ np.array([0.3, 0.59, 0.11])
+    dark = lum < 0.22
+    out = c * 0.30
+    out[dark] = c[dark] * 0.5 + 0.30
+    return out
+
+
 def edges(buf, cam, depth_tol_mm=1.5):
     """Outline pixels: object boundaries, depth jumps and creases."""
     z, idb, n = buf.z, buf.id, buf.n
@@ -233,7 +242,7 @@ def render(cam, objs, clip=None, ink=None, ink_rgb=(0.08, 0.25, 0.55), base=None
         draw_points(cam, buf, ink, np.array(ink_rgb), max(2, int(1.8 * cam.scale)))
     e = edges(buf, cam)
     col = buf.col.copy()
-    col[e] *= 0.30
+    col[e] = outline(col[e])
     # transparent parts: nearest layer of each object, blended far -> near
     layers = []
     for name, V, F, rgb, a in trans:
@@ -338,7 +347,7 @@ class LiveView:
             draw_points(cam, buf, ink, np.array([0.08, 0.25, 0.55]), max(2, int(1.8 * cam.scale)))
         e = edges(buf, cam)
         col = buf.col.copy()
-        col[e] *= 0.30
+        col[e] = outline(col[e])
         layers = list(self.trans)
         if self.hand_layers:
             layers.append(self.hand_layers.get(hand_pose, self.hand_layers.get("rest")))

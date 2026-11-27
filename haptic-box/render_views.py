@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt                      # noqa: E402
 from matplotlib.animation import FuncAnimation, PillowWriter  # noqa: E402
 
-import palm_writer as pw                             # noqa: E402
+from comlang import engine as pw                      # noqa: E402
 
 from cad_render import (Scene, Camera, Buffers, raster, edges, draw_points, render,  # noqa: E402
                         trans_layer, opaque_base, HERE, MESH)
@@ -107,60 +107,58 @@ def save(fig, name):
 def view_product(sc):
     P = sc.p
     cam = Camera((0.55, -0.85, 0.62), (0, 140, 40), 560, (1500, 1050))
-    objs = sc.objects(pose=(0, 0, 0), alpha={"TopPlate": 0.0, "HandDummy": 0.0, "ForearmDummy": 0.0},
-                      color={"TopPlate": (0.90, 0.91, 0.92)})
+    objs = sc.objects(pose=(0, 0, 0), alpha={"TopPlate": 0.0, "HandDummy": 0.0, "ForearmDummy": 0.0})
     img = render(cam, objs)
-    fig, ax = figure(img, "ComLang palm-writing box (v2 prototype, thin)",
-                     "Right hand palm-down in the glove-shaped well; the pen writes on the palm from below, "
+    fig, ax = figure(img, "ComLang palm-writing box (v2 prototype, 20 mm flat)",
+                     "Right hand palm-down in the glove-shaped recess; the pen writes on the palm from below, "
                      "through a cover.")
     B, H, PZ = P["buttons"], P["BOX_H"], P["PALM_Z"]
     D = P["display"]
     callouts(ax, cam, [
-        ((B["Wheel"][0], B["Wheel"][1], PZ + 4), "thumb wheel: roll = speed,\npress = pause", "L"),
-        ((B["Repeat"][0], B["Repeat"][1], PZ + 5), "Repeat: raised circular arrow\n(little finger)", "R"),
+        ((B["Wheel"][0], B["Wheel"][1], PZ + 2.5), "thumb scroll roller: roll = speed,\npress = pause", "L"),
+        ((B["Repeat"][0], B["Repeat"][1], PZ + 2.5), "Repeat: raised circular arrow\n(little finger)", "R"),
         ((B["Mode"][0], B["Mode"][1], H), "Mode (free hand): palm / Braille / both", "L"),
         ((0, P["PALM_Y"], PZ), "cover over the pen window\n(replaceable membrane)", "R"),
-        ((0, 20, PZ), "%d mm deep glove-shaped well,\nopen to the front for the wrist" % P["RECESS"], "L"),
-        ((P["braille"][0][0], P["braille"][0][1] + 14, H), "Braille cells under\nindex + middle fingertips", "L"),
+        ((0, 20, PZ), "%.1f mm deep glove-shaped recess,\nopen to the front for the wrist" % P["RECESS"], "L"),
+        ((P["braille"][0][0], P["braille"][0][1], PZ), "pop-out Braille pins under\nindex + middle fingertips", "L"),
         ((D["x"], D["y"], H), "speaker display\n(text faces the speaker)", "R"),
         ((B["Reset"][0], B["Reset"][1], H), "speaker's Reset", "R"),
         ((0, -100, H - 10), "forearm pad (separate part)", "R"),
-        ((130, 200, 25), "box %d x %d x %d mm" % (P["BOX_W"], P["BOX_L"], H), "R"),
+        ((130, 200, H / 2), "box %d x %d x %d mm" % (P["BOX_W"], P["BOX_L"], H), "R"),
     ], img.shape[1])
     save(fig, "v2_product.png")
 
 
 def view_cutaway(sc, pose=(-10, 8, 1)):
     P = sc.p
-    cam = Camera((0.5, -0.78, 0.75), (0, 160, 30), 470, (1500, 1100))
+    cam = Camera((0.5, -0.78, 0.75), (0, 160, 8), 470, (1500, 1100))
     objs = sc.objects(pose=pose, hide=("WristPad",),
-                      alpha={"TopPlate": 0.85, "HandDummy": 0.75, "ForearmDummy": 0.75, "Shell": 0.9,
+                      alpha={"TopPlate": 0.85, "HandDummy": 0.8, "ForearmDummy": 0.8, "Shell": 0.9,
                              "ForearmPad": 0.75, "CoverMembrane": 0.8, "SpeakerDisplay": 0.6})
     t, x, y, z, _ = pw.build_path("H")
     img = render(cam, objs, ink=sc.ink_points(x, y, z))
-    fig, ax = figure(img, "Cut-away: crossed-bar XY gantry on four drive shafts",
-                     "Top plate, hand and walls transparent. The perimeter shafts are the rails AND the "
-                     "drive shafts, so there is no drive layer below them.")
-    PY, PZ = P["PALM_Y"], P["PALM_Z"]
-    cy = PY + pose[1]
-    cx = -pose[0]
-    zy, zx = P["Z_YRAIL"], P["Z_XRAIL"]
-    XM, YM = P["XMOTOR"], P["YMOTOR"]
+    fig, ax = figure(img, "Cut-away: flat CoreXY gantry, 20 mm box",
+                     "Top plate, hand and walls transparent. Two flat BLDC motors drive two belts lying in two "
+                     "flat layers; the gantry slides on the Y-rods, the carriage on the twin X-rods.")
+    PY, PZ, F = P["PALM_Y"], P["PALM_Z"], P["FLOOR"]
+    cy, cx = PY + pose[1], -pose[0]
+    MA, MB, BX = P["MOTOR_A"], P["MOTOR_B"], P["BELT_X"]
+    za, zb = P["BELT_A_Z"] + 1.5, P["BELT_B_Z"] + 1.5
     callouts(ax, cam, [
-        ((40, cy - 16, P["Z_YBAR"]), "Y-bar (D6): moves in y", "R"),
-        ((cx - 16, PY - 60, P["Z_XBAR"]), "X-bar (D6): moves in x", "L"),
-        ((cx + 30, cy, 18), "carriage + flat solenoid\nand wedge pen lifter", "R"),
+        ((P["RAIL_X"], cy, P["Z_XROD"]), "gantry: Y-blocks + twin X-rods\n(moves in y)", "R"),
+        ((cx + 20, cy, 11), "carriage + mini solenoid\nand wedge pen lifter", "R"),
         ((cx, cy, PZ + 1), "pen tip pressing the cover\ninto the palm", "R"),
-        ((-110, 120, zy), "y-shaft: rail of the Y-bar,\ndrives the x-belts", "L"),
-        ((60, PY - 88, zx), "x-shaft: rail of the X-bar,\ndrives the y-belts", "R"),
-        ((XM["x"], XM["y"] + 17, XM["z"]), "X stepper (short belt)", "L"),
-        ((YM["x"], YM["y"], YM["z"]), "Y stepper (short belt)", "R"),
-        ((52, 30, 15), "Raspberry Pi 5", "R"),
-        ((-69, 29, 14), "motion controller (GRBL)", "L"),
-        ((-30, 280, 34), "Braille cell modules", "L"),
+        ((-P["RAIL_X"], P["PALM_Y"] - 55, P["Z_YROD"]), "Y-rod (D5): rail of the gantry", "L"),
+        ((-BX, 225, za), "belt A (lower layer)", "L"),
+        ((BX, 90, zb), "belt B (upper layer)", "R"),
+        ((MA[0], MA[1], F + P["MOTOR_H"]), "flat BLDC motor A (x + y)", "L"),
+        ((MB[0], MB[1], F + P["MOTOR_H"]), "flat BLDC motor B (x - y)", "R"),
+        ((60, 27, 6), "phase 2: CM5 carrier", "R"),
+        ((-60, 27, 6), "controller: Pico + 2 BLDC drivers", "L"),
+        ((P["braille"][0][0], P["braille"][0][1], 12), "pop-out Braille actuators", "L"),
         ((P["display"]["x"], P["display"]["y"], P["BOX_H"]), "speaker display", "R"),
-        ((P["buttons"]["Wheel"][0], P["buttons"]["Wheel"][1], 40), "thumb wheel + encoder", "L"),
-        ((0, -60, 70), "forearm on its pad (translucent)", "L"),
+        ((P["buttons"]["Wheel"][0], P["buttons"]["Wheel"][1], P["BOX_H"]), "thumb scroll roller", "L"),
+        ((0, -60, 45), "forearm on its pad (translucent)", "L"),
     ], img.shape[1], top=120, bottom=1070)
     save(fig, "v2_cutaway.png")
 
@@ -168,40 +166,39 @@ def view_cutaway(sc, pose=(-10, 8, 1)):
 def view_section(sc):
     P = sc.p
     cut_x = 0.0                                  # plane through the pen axis (pen at palm centre)
-    cam = Camera((1, 0, 0), (0, 115, 45), 220, (1800, 650))
-    objs = sc.objects(pose=(0, 0, 1), alpha={"TopPlate": 0.0, "HandDummy": 0.0, "Shell": 0.0,
-                                             "ForearmDummy": 0.0})
+    cam = Camera((1, 0, 0), (0, 150, 25), 240, (2400, 600))
+    objs = sc.objects(pose=(0, 0, 1), alpha={"TopPlate": 0.0, "HandDummy": 0.55, "Shell": 0.0,
+                                             "ForearmDummy": 0.55})
     img = render(cam, objs, clip=(0, cut_x))
-    fig, ax = figure(img, "Section through the pen axis (x = 0), pen DOWN: box %d mm tall (was 80)" % P["BOX_H"],
-                     "Reddish = cut faces. Hand palm-down in the %d mm deep well; the pen rises through the window "
-                     "and presses the cover into the palm." % P["RECESS"])
+    fig, ax = figure(img, "Section through the pen axis (x = 0), pen DOWN: box %d mm tall (was 54)" % P["BOX_H"],
+                     "Reddish = cut faces. Hand (translucent) palm-down in the %.1f mm glove recess; the pen rises "
+                     "through the window and presses the cover into the palm." % P["RECESS"])
     H, PZ, PU, L = P["BOX_H"], P["PALM_Z"], P["PLATE_UNDER"], P["BOX_L"]
     y0 = -142
-    dim(ax, cam, (cut_x, L - 8, 0), (cut_x, L - 8, H), "%d" % H, (0, 0))
+    dim(ax, cam, (cut_x, L + 4, 0), (cut_x, L + 4, H), "%d" % H, (0, 0))
+    dim(ax, cam, (cut_x, L + 30, 0), (cut_x, L + 30, PZ), "%.1f palm" % PZ, (0, 0))
     dim(ax, cam, (cut_x, 0, -8), (cut_x, L, -8), "%d box" % L, (0, 0))
     dim(ax, cam, (cut_x, y0, -8), (cut_x, 0, -8), "142 pad", (0, 0))
-    dim(ax, cam, (cut_x, P["PALM_Y"] - 42, H + 14), (cut_x, P["PALM_Y"] + 42, H + 14),
+    dim(ax, cam, (cut_x, P["PALM_Y"] - 42, H + 30), (cut_x, P["PALM_Y"] + 42, H + 30),
         "84 window", (0, 0))
-    dim(ax, cam, (cut_x, 40, PU), (cut_x, 40, H), "%d plate" % P["TOP_T"], (60, 0))
     PY = P["PALM_Y"]
     callouts(ax, cam, [
-        ((cut_x, PY, PZ + 1.5), "pen tip: 1.5 mm into the palm,\nthrough the cover", "R"),
-        ((cut_x, PY + 88, P["Z_XRAIL"]), "back x-shaft (z %d)" % P["Z_XRAIL"], "R"),
-        ((cut_x, PY - 16, P["Z_YBAR"]), "Y-bar (z %d)" % P["Z_YBAR"], "L"),
-        ((cut_x, PY - 88, P["Z_XRAIL"]), "front x-shaft + X-bar block", "L"),
+        ((cut_x, -60, 45), "forearm", "L"),
+        ((cut_x, 100, 40), "hand, palm down (medium)", "L"),
+        ((cut_x, -80, 12), "forearm pad", "L"),
+        ((cut_x, PY - P["IDLER_DY"] - 5, P["BELT_A_Z"] + 1.5), "belt A run (lower layer)", "L"),
+        ((cut_x, 240, PU - 2), "top plate: %.1f + %.1f mm" % (P["BASE_T"], P["RECESS"]), "L"),
         ((cut_x, 340, H - 4), "speaker display", "R"),
-        ((cut_x, 275, 32), "Braille cell module", "R"),
-        ((cut_x, 120, 70), "hand, palm down (medium)", "L"),
-        ((cut_x, -60, 75), "forearm", "L"),
-        ((cut_x, -80, 30), "forearm pad", "L"),
-        ((cut_x, 30, 12), "electronics bay", "L"),
+        ((cut_x, PY, PZ + 1.5), "pen tip: 1.5 mm into the palm,\nthrough the cover", "R"),
+        ((cut_x, PY + P["XROD_DY"], P["Z_XROD"]), "twin X-rods + carriage", "R"),
+        ((cut_x, PY + P["IDLER_DY"] + 5, P["BELT_B_Z"] + 1.5), "belt B run (upper layer)", "R"),
     ], img.shape[1], top=130, bottom=560)
     save(fig, "v2_section.png")
 
 
 def view_section_detail(sc, down=1):
     P = sc.p
-    cam = Camera((1, 0, 0), (0, 160, 30), 150, (1500, 1050))
+    cam = Camera((1, 0, 0), (0, 160, 24), 95, (1500, 660))
     objs = sc.objects(pose=(0, 0, down), alpha={"TopPlate": 0.0, "HandDummy": 0.0, "Shell": 0.0},
                       hide=("ForearmDummy", "ForearmPad"))
     img = render(cam, objs, clip=(0, 0.0))
@@ -209,22 +206,21 @@ def view_section_detail(sc, down=1):
                      "Heights from the table (mm). Retracted: tip %.1f mm below the cover; pressed: 1.5 mm into "
                      "the palm." % (P["PALM_Z"] - P["PEN_UP_TIP"]))
     H, PZ, PU, PY = P["BOX_H"], P["PALM_Z"], P["PLATE_UNDER"], P["PALM_Y"]
-    yd = PY + 50
-    zy, zb, zx = P["Z_YBAR"], P["Z_XBAR"], P["Z_XRAIL"]
-    for i, (z, t) in enumerate(((zy, "%d" % zy), (zb, "%d" % zb), (PU, "%d" % PU), (PZ, "%d palm" % PZ),
-                                (H, "%d top" % H))):
-        dim(ax, cam, (0, yd + 9 * i, 0), (0, yd + 9 * i, z), t, (0, 0))
-    dim(ax, cam, (0, PY - 42, H + 8), (0, PY + 42, H + 8), "window 84", (0, 0))
+    yd = PY + 32
+    for i, (z, t) in enumerate(((P["FLOOR"], "%.1f base" % P["FLOOR"]), (P["Z_XROD"], "%.1f X-rods" % P["Z_XROD"]),
+                                (PU, "%d" % PU), (PZ, "%.1f palm" % PZ), (H, "%d top" % H))):
+        dim(ax, cam, (0, yd + 6 * i, 0), (0, yd + 6 * i, z), t, (0, 0))
+    dim(ax, cam, (0, PY - 42, H + 4), (0, PY + 42, H + 4), "window 84", (0, 0))
     callouts(ax, cam, [
-        ((0, PY - 30, 60), "hand, palm down (palm skin at z = %d)" % PZ, "L"),
+        ((0, PY - 28, 30), "hand, palm down (palm skin at z = %.1f)" % PZ, "L"),
         ((0, PY - 45, PZ - 0.2), "cover: membrane on a drop-in frame", "L"),
         ((0, PY, PZ + 1.5 if down else P["PEN_UP_TIP"]), "pen tip, 0.5 mm radius point", "R"),
-        ((0, PY + 4, 17), "pen lifter: flat solenoid + wedge\n(force set by the tip spring)", "R"),
-        ((-16, PY - 16, zy), "Y-bar, 6 mm rod (z %d)" % zy, "L"),
-        ((-16, PY - 16 - 12, 12), "carriage: cross block on both bars", "L"),
-        ((0, PY - 60, zb), "X-bar, 6 mm rod (z %d)" % zb, "L"),
-        ((0, PY - 52, PU + 2), "top plate floor layer, %d mm" % P["BASE_T"], "L"),
-    ], img.shape[1], top=140, bottom=1000)
+        ((0, PY + 2, 5.5), "pen lifter: mini solenoid + wedge\n(force set by the tip spring)", "R"),
+        ((0, PY - P["XROD_DY"], P["Z_XROD"]), "twin X-rods D5 (z %.1f)" % P["Z_XROD"], "L"),
+        ((0, PY - P["IDLER_DY"] - 5, P["BELT_A_Z"] + 1.5), "belt A, lower layer (clamped)", "L"),
+        ((0, PY + P["IDLER_DY"] + 5, P["BELT_B_Z"] + 1.5), "belt B, upper layer (clamped)", "R"),
+        ((0, PY - 52, PU + 1), "top plate floor layer, %.1f mm aluminium" % P["BASE_T"], "L"),
+    ], img.shape[1], top=140, bottom=620)
     save(fig, "v2_section_detail.png" if down else "v2_section_detail_up.png")
 
 
@@ -232,8 +228,7 @@ def view_top(sc):
     P = sc.p
     cam = Camera((0, 0, 1), (0, 140, 0), 580, (1250, 1450))
     objs = sc.objects(pose=(0, 0, 0), alpha={"HandDummy": 0.55, "ForearmDummy": 0.6, "TopPlate": 0.0,
-                                             "CoverMembrane": 0.6},
-                      color={"TopPlate": (0.92, 0.93, 0.94)})
+                                             "CoverMembrane": 0.6})
     img = render(cam, objs)
     fig, ax = figure(img, "Top layout (right hand)", "Coordinates in mm: x from the centre line, y from the box front edge.")
     H = P["BOX_H"] + 8
@@ -243,14 +238,14 @@ def view_top(sc):
     dim(ax, cam, (W2 + 12 + 30, 0, H), (W2 + 42, P["PALM_Y"], H), "155 to writing centre", (0, 0))
     dim(ax, cam, (W2 + 12 + 60, 0, H), (W2 + 72, P["WRIST_Y"], H), "100 wrist", (0, 0))
     B = P["buttons"]
-    items = [((B["Wheel"][0], B["Wheel"][1], H), "thumb wheel (%d, %d)" % tuple(B["Wheel"]), "L"),
+    items = [((B["Wheel"][0], B["Wheel"][1], H), "thumb roller (%d, %d)" % tuple(B["Wheel"]), "L"),
              ((B["Repeat"][0], B["Repeat"][1], H), "Repeat D26 (%d, %d)" % tuple(B["Repeat"]), "R"),
              ((B["Mode"][0], B["Mode"][1], H), "Mode D24, free hand (%d, %d)" % tuple(B["Mode"]), "L"),
              ((B["Reset"][0], B["Reset"][1], H), "speaker Reset (%d, %d)" % tuple(B["Reset"]), "R")]
     items += [((x, y, H), "Braille cell, %s (%d, %d)" % (f, x, y), "L")
               for (x, y), f in zip(P["braille"], ("index", "middle"))]
     D = P["display"]
-    items += [((P["wrist_pad"][0], P["wrist_pad"][1], H), "hand-present pad (0, 75)", "R"),
+    items += [((P["wrist_pad"][0], P["wrist_pad"][1], H), "hand-present pad (0, 75)", "L"),
               ((84, 335, H), "mic grille", "R"), ((0, -70, H), "forearm pad", "R"),
               ((D["x"], D["y"], H), "speaker display 3.5\" (%d, %d)" % (D["x"], D["y"]), "L"),
               ((40, P["PALM_Y"] - 40, H), "cover cassette %d x %d over the 84 window" % (P["COVER"], P["COVER"]), "R"),
@@ -262,7 +257,7 @@ def view_top(sc):
 def view_layers(sc):
     """Exploded stack: top plate, hand, gantry, base."""
     P = sc.p
-    cam = Camera((0.55, -0.85, 0.42), (0, 185, 110), 640, (1400, 1250))
+    cam = Camera((0.55, -0.85, 0.42), (0, 185, 100), 640, (1400, 1250))
     lift = {n: 80 for n in ("TopPlate", "WristPad", "BraillePins", "BrailleCells", "ButtonSwitches", "Mic",
                             "SpeakerDisplay") + tuple(n for n in sc.static if n.startswith("Button"))}
     lift.update({"CoverFrame": 130, "CoverMembrane": 130, "HandDummy": 210, "ForearmDummy": 210})
@@ -271,27 +266,27 @@ def view_layers(sc):
                                          alpha={"HandDummy": 0.35, "ForearmDummy": 0.5, "TopPlate": 0.0}):
         objs.append((name, V + np.array([0, 0, lift.get(name, 0)]), F, rgb, a))
     img = render(cam, objs)
-    fig, ax = figure(img, "Exploded build stack", "Base tray with gantry and electronics; top plate with controls, "
+    fig, ax = figure(img, "Exploded build stack (20 mm box)", "Base tray with gantry and electronics; top plate with controls, "
                      "Braille and display; drop-in cover; hand.")
     H = P["BOX_H"]
     callouts(ax, cam, [
-        ((-110, 40, H + 80), "3  top plate: %d mm floor layer + %d mm\n    glove-well layer, window, holes" % (P["BASE_T"], P["RECESS"]), "L"),
-        ((-30, 285, H + 50), "    Braille cells, switches, display\n    mounted in / under the plate", "L"),
+        ((-110, 40, H + 80), "3  top plate: %.1f mm aluminium floor + %.1f mm\n    recess layer, window, holes" % (P["BASE_T"], P["RECESS"]), "L"),
+        ((P["display"]["x"] - 30, P["display"]["y"], H + 80), "    Braille cells, switches, display\n    mounted in / under the plate", "L"),
         ((50, P["PALM_Y"], P["PALM_Z"] + 130), "4  drop-in cover cassette (lifts out)", "R"),
-        ((0, 140, H + 240), "5  hand rests palm-down in the well", "R"),
-        ((0, P["PALM_Y"] - 10, 25), "2  XY gantry + pen on the base", "R"),
-        ((125, 80, 20), "1  base tray: 3 mm walls, floor,\n    electronics, steppers", "R"),
+        ((0, 140, H + 240), "5  hand rests palm-down in the recess", "R"),
+        ((0, P["PALM_Y"] - 10, 12), "2  flat CoreXY gantry + pen on the base", "R"),
+        ((125, 80, 10), "1  base tray: 1.5 mm aluminium base, 2 mm walls,\n    electronics, flat motors", "R"),
     ], img.shape[1], top=150)
     save(fig, "v2_exploded.png")
 
 
 def anim_writing(sc, text="HI"):
     P = sc.p
-    cam = Camera((0.62, -0.62, 0.48), (0, 155, 38), 230, (900, 680), ss=2)
+    cam = Camera((0.62, -0.62, 0.48), (0, 155, 14), 230, (900, 680), ss=2)
     t, x, y, z, _ = pw.build_path(text)
     step = 3
     idx = list(range(0, len(t), step))
-    alpha = {"TopPlate": 0.80, "HandDummy": 0.72, "ForearmDummy": 0.72, "Shell": 0.9, "ForearmPad": 0.75,
+    alpha = {"TopPlate": 0.80, "HandDummy": 0.5, "ForearmDummy": 0.55, "Shell": 0.9, "ForearmPad": 0.75,
              "CoverMembrane": 0.8}
     hide = ("WristPad",)
     objs0 = sc.objects(hide=hide, alpha=alpha)
@@ -332,13 +327,12 @@ def view_hands(sc):
     cam = Camera((0, 0, 1), (0, 175, 0), 300, (620, 800))
     for size in ("small", "medium", "large"):
         objs = sc.objects(hand=size, hide=("ForearmPad",), alpha={"TopPlate": 0.0, "HandDummy": 0.15,
-                                                                 "ForearmDummy": 0.15},
-                          color={"TopPlate": (0.92, 0.93, 0.94)})
+                                                                 "ForearmDummy": 0.15})
         imgs.append((size, render(cam, objs)))
     fig = plt.figure(figsize=(18.6, 9.6), dpi=100)
-    fig.text(0.012, 0.965, "Hand sizes in the glove-shaped well (top view)", fontsize=19, weight="bold", color="#222")
+    fig.text(0.012, 0.965, "Hand sizes in the glove-shaped recess (top view)", fontsize=19, weight="bold", color="#222")
     fig.text(0.012, 0.935, "Glove print: each digit and the palm is the hull over all three hand sizes + 5 mm. "
-             "Every size reaches the thumb wheel and Repeat without moving the hand.", fontsize=12, color="#555")
+             "Every size reaches the thumb roller and Repeat without moving the hand.", fontsize=12, color="#555")
     B = P["button_spec"]
     for i, (size, img) in enumerate(imgs):
         ax = fig.add_axes([0.005 + i * 0.333, 0.12, 0.323, 0.79])
@@ -363,19 +357,18 @@ def view_press(sc, size="medium"):
     shots = []
     W, R, M = P["buttons"]["Wheel"], P["buttons"]["Repeat"], P["buttons"]["Mode"]
     pz = P["PALM_Z"]
-    views = {"Wheel": ((0.25, -0.8, 0.75), (W[0] + 20, W[1], pz + 10), 150, "Wheel"),
-             "Repeat": ((0.7, -0.5, 0.7), (R[0] - 10, R[1], pz + 10), 150, "Repeat"),
+    views = {"Wheel": ((0.25, -0.8, 0.75), (W[0] + 20, W[1], pz + 6), 150, "Wheel"),
+             "Repeat": ((0.7, -0.5, 0.7), (R[0] - 10, R[1], pz + 6), 150, "Repeat"),
              "Mode": ((0.3, -0.7, 0.8), (M[0] + 10, M[1] + 5, P["BOX_H"]), 110, "rest")}
     for name, (d, c, ext, pose) in views.items():
         cam = Camera(d, c, ext, (620, 560))
         objs = sc.objects(hand=size, hand_pose=pose, hide=("ForearmPad", "WristPad"),
-                          alpha={"TopPlate": 0.0, "HandDummy": 0.25, "ForearmDummy": 0.25},
-                          color={"TopPlate": (0.90, 0.91, 0.92)})
+                          alpha={"TopPlate": 0.0, "HandDummy": 0.25, "ForearmDummy": 0.25})
         shots.append((name, render(cam, objs)))
     fig = plt.figure(figsize=(18.6, 6.4), dpi=100)
     fig.text(0.012, 0.94, "Controls without lifting the resting hand (%s hand)" % size, fontsize=19,
              weight="bold", color="#222")
-    desc = {"Wheel": "thumb swings out ~22° onto the wheel: roll = speed, press = pause",
+    desc = {"Wheel": "thumb swings out ~22° onto the roller: roll = speed, press = pause",
             "Repeat": "little finger swings out onto the circular-arrow cap",
             "Mode": "free hand: Mode (palm / Braille / both)"}
     for i, (name, img) in enumerate(shots):
@@ -391,17 +384,16 @@ def view_symbols(sc):
     P = sc.p
     B = P["buttons"]
     pz, H = P["PALM_Z"], P["BOX_H"]
-    items = [("Thumb wheel: + far end (faster),\n- near end (slower), || press = pause", B["Wheel"], pz, 46),
+    items = [("Thumb roller: + far end (faster), - near end\n(slower), || press = pause (marks incised)", B["Wheel"], pz, 46),
              ("Repeat: circular arrow", B["Repeat"], P["CAP_TOP"], 36),
              ("Mode: Braille cell + pen stroke", B["Mode"], H, 34),
              ("Reset (speaker): x", B["Reset"], H, 30)]
     fig = plt.figure(figsize=(18.6, 5.6), dpi=100)
-    fig.text(0.012, 0.93, "Tactile symbols on every control (raised 0.8 mm, 1.4 mm lines)", fontsize=19,
+    fig.text(0.012, 0.93, "Tactile symbols on every control (raised 0.8 mm on the caps, 1.4 mm lines)", fontsize=19,
              weight="bold", color="#222")
     for i, (title, (x, y), z, ext) in enumerate(items):
         cam = Camera((0.35, -0.75, 0.75), (x, y, z), ext, (600, 520))
-        objs = sc.objects(hide=("HandDummy", "ForearmDummy"), alpha={"TopPlate": 0.0},
-                          color={"TopPlate": (0.90, 0.91, 0.92)})
+        objs = sc.objects(hide=("HandDummy", "ForearmDummy"), alpha={"TopPlate": 0.0})
         img = render(cam, objs)
         ax = fig.add_axes([0.005 + i * 0.25, 0.02, 0.24, 0.78])
         ax.imshow(img)

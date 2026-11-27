@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""FreeCAD macro: ComLang haptic palm-writing box v2 (prototype CAD), parametric. Thin version (54 mm).
+"""FreeCAD macro: ComLang haptic palm-writing box v2 (prototype CAD), parametric. Flat version (20 mm).
 
-The hand lies PALM DOWN in a glove-shaped well on the box top. Under the palm is a window
-closed by a replaceable cover membrane; a pointed pen on a crossed-bar XY gantry inside the
-box presses up through the membrane and traces block capitals on the palm. A thumb scroll
-wheel (roll = speed, press = pause) and a Repeat button by the little finger, a Mode button for
-the free hand, all with raised tactile symbols. Braille cells under the index and middle fingertips; a display and Reset
-button for the speaker at the rear.
+The hand lies PALM DOWN in a shallow glove-shaped recess on the box top. Under the palm is a
+window closed by a replaceable cover membrane; a pointed pen on a flat CoreXY gantry (two flat
+gimbal motors, belts in two flat layers) presses up through the membrane and traces block
+capitals on the palm. A thumb scroll roller (roll = speed, press = pause) and a Repeat button by
+the little finger, a Mode button for the free hand, all with raised tactile symbols. Pop-out
+Braille pins (latching actuators) under the index and middle fingertips; a display and Reset
+button for the speaker at the rear. The box is 20 mm tall.
 
 GUI:       freecad haptic_box_v2.FCMacro   (animates the gantry writing TEXT;
            stop with stop_writer() in the Python console)
@@ -15,7 +16,7 @@ Headless:  freecadcmd haptic_box_v2.FCMacro
            HAPTIC_DUMP=build/v2_mesh.json also writes meshes for render_views.py
 
 Frame: x across (+x = user's right), y away from the user (y=0 = front face),
-z up from the table. Units mm. Needs palm_writer.py and hand_model.py in the same folder.
+z up from the table. Units mm. Needs comlang/ (engine) and hand_model.py in the same folder.
 """
 import json, math, os, sys, time
 import FreeCAD as App
@@ -25,39 +26,42 @@ from FreeCAD import Vector, Placement, Rotation
 # ---------------- parameters ----------------
 HAND = "right"                 # "right" / "left": mirrors thumb side, buttons and Braille cells
 BOX_W, BOX_L = 260.0, 380.0   # outside footprint (rear 70 mm = speaker strip: display, Reset, mic)
-WALL, FLOOR = 3.0, 3.0
-PLATE_UNDER = 40.0             # underside of the top plate (fixed by the NEMA14 motors, 3 + 35 + 2)
-BASE_T = 4.0                   # lower top-plate layer: the floor the hand rests on
-RECESS = 10.0                  # depth of the hand well = thickness of the upper layer
+WALL, FLOOR = 2.0, 1.5         # walls; aluminium base sheet (also the motor heat sink)
+PLATE_UNDER = 15.0             # underside of the top plate: the whole mechanism lives in 1.5..15
+BASE_T = 2.5                   # lower top-plate layer (aluminium): the floor the hand rests on
+RECESS = 2.5                   # depth of the glove-shaped recess = thickness of the upper layer
 TOP_T = BASE_T + RECESS        # whole top plate
-PALM_Z = PLATE_UNDER + BASE_T  # palm skin height (rests on the well floor / cover) = 44
-BOX_H = PALM_Z + RECESS        # top surface height = 54
-EDGE_R = 3.0                   # rounded top edge of the well
+PALM_Z = PLATE_UNDER + BASE_T  # palm skin height (rests on the recess floor / cover) = 17.5
+BOX_H = PALM_Z + RECESS        # top surface height = 20
+EDGE_R = 1.2                   # rounded top edge of the recess
 CORNER_R = 12.0
 WRIST_Y = 100.0                # wrist crease position
 PALM_Y = WRIST_Y + 55.0        # centre of the writing area
-WRIST_CHANNEL_W = 80.0         # the well opens to the front edge so the forearm lies level
+WRIST_CHANNEL_W = 80.0         # the recess opens to the front edge so the forearm lies level
 WINDOW, WINDOW_R = 84.0, 8.0   # opening under the palm (70 mm workspace + pen + margin)
 GLOVE_MARGIN = 5.0             # glove print: room around the hull of all hand sizes
 # protective cover between pen and palm: a membrane stretched on a drop-in cassette frame
 COVER, COVER_R = 100.0, 10.0   # cassette outside (sits in a pocket in the floor layer)
-COVER_FRAME_T = 1.7            # frame thickness; membrane on top
+COVER_FRAME_T = 1.2            # frame thickness (stainless); membrane on top
 COVER_T = 0.3                  # membrane thickness (material under test, §10 T13)
 PEN_PRESS = 1.5                # how far the tip pushes above the floor (membrane + skin indentation)
-PEN_UP_GAP = 1.5               # retracted tip sits this far below the plate underside
-# gantry: crossed bars (one writing plane) on four perimeter shafts that are BOTH the rails and
-# the drive shafts (Ultimaker-style); no separate drive layer under the rails -> thin box
-SHAFT_R, BAR_R = 4.0, 3.0      # perimeter shafts D8 (rotate in 688ZZ), cross bars D6
-BORE_SHAFT, BORE_BAR = 4.3, 3.3
-Z_YRAIL, Z_XRAIL = 13.0, 29.0  # left/right shafts (along y) / front/back shafts (along x)
-Z_YBAR, Z_XBAR = 16.0, 24.0    # bar along x that moves in y / bar along y that moves in x
-RAIL_X = 110.0                 # y-shafts at x = +-RAIL_X
-RAIL_DY = 88.0                 # x-shafts at y = PALM_Y +- RAIL_DY
-BELT_X_THUMB, BELT_X_LITTLE = 70.0, 80.0   # y-belt x, thumb / little-finger side: clear of the
-                                           # thumb wheel and the Repeat switch above them
-XBELT_IN = 14.0                # x-belts run this far inboard of the x-shafts
-PULLEY_R, FLANGE_R = 6.37, 9.0 # GT2 20T pitch radius / flange
-PEN_DX, PEN_DY = 16.0, 16.0    # pen sits diagonally off the carriage centre, clear of both bars
+PEN_UP_GAP = 1.0               # retracted tip sits this far below the plate underside
+# gantry: CoreXY. Two flat gimbal BLDC motors drive two GT2 3 mm belts running FLAT in two
+# layers; the gantry (two Y-blocks + twin X-rods) slides on the Y-rods, the carriage on the X-rods.
+ROD_R = 2.5                    # Y-rods and X-rods D5 (iglidur J bushings, 7 mm OD)
+BORE = 3.5                     # bushing housing radius
+RAIL_X = 108.0                 # Y-rods at x = +-RAIL_X
+Z_YROD, Z_XROD = 7.0, 10.5     # rod heights
+XROD_DY = 7.0                  # twin X-rods at gantry y +- XROD_DY
+ROD_Y0, ROD_Y1 = PALM_Y - 60.0, PALM_Y + 60.0     # Y-rod supports
+BELT_W = 3.0                   # GT2 3 mm belt (width is vertical: belts run flat)
+BELT_A_Z, BELT_B_Z = 2.0, 5.5  # bottom of belt A (lower) / belt B (upper)
+BELT_X = 98.0                  # belt runs along y at x = +-BELT_X
+IDLER_R = 5.0                  # GT2 16T idler (pitch r ~5)
+IDLER_DY = 16.0                # gantry idlers at gantry y -+ IDLER_DY (A front, B rear)
+RING_R = 15.9                  # GT2 50T ring pulley on each motor rotor (pitch radius)
+MOTOR_R, MOTOR_H = 14.0, 10.5  # flat gimbal BLDC (2804 class), can D28 x 10.5 on the base
+PEN_DX, PEN_DY = 0.0, 0.0      # pen at the carriage centre, between the twin X-rods
 TEXT = "HELLO"                 # GUI animation
 # --------------------------------------------
 
@@ -66,22 +70,22 @@ try:
 except NameError:
     HERE = os.getcwd()
 sys.path.insert(0, HERE)
-import palm_writer as pw  # noqa: E402
+from comlang import engine as pw  # noqa: E402
 
 TS = -1.0 if HAND == "right" else 1.0   # thumb side: palm down, a right thumb points to -x
 PEN_UP_TIP = PLATE_UNDER - PEN_UP_GAP
 PEN_DOWN_TIP = PALM_Z + PEN_PRESS
-NEMA14 = 35.0
-def belt_x(sx):
-    """|x| of the y-belt on side sx (driven by pulleys on the x-shafts)."""
-    return BELT_X_THUMB if sx == TS else BELT_X_LITTLE
-XBELT_DY = RAIL_DY - XBELT_IN              # x-belts at PALM_Y +- XBELT_DY (pulleys on the y-shafts)
+GC_MIN, GC_MAX = PALM_Y - pw.WORKSPACE / 2, PALM_Y + pw.WORKSPACE / 2   # gantry centre travel
+MOTOR_A = (-BELT_X + RING_R, ROD_Y1 + 23.0)     # rear-left, belt A (lower layer)
+MOTOR_B = (BELT_X - RING_R, ROD_Y0 - 23.0)      # front-right, belt B (upper layer)
+IDLER_A = (BELT_X - IDLER_R, MOTOR_A[1] + RING_R - IDLER_R)    # rear-right corner idler, belt A
+IDLER_B = (-BELT_X + IDLER_R, MOTOR_B[1] - RING_R + IDLER_R)   # front-left corner idler, belt B
 import hand_model as HM  # noqa: E402
 
 HANDS = {s: HM.Hand(s, WRIST_Y, PALM_Z, TS) for s in HM.SIZES}   # small / medium / large
 MED = HANDS["medium"]
-CAP_TOP = PALM_Z + 5.0          # Repeat cap stands 5 mm above the well floor
-WHEEL_R, WHEEL_W, WHEEL_UP = 11.0, 8.0, 4.0   # thumb wheel: D22 x 8, crown 4 mm above the floor
+CAP_TOP = PALM_Z + 2.5          # Repeat cap top flush with the top surface (2.5 above the recess floor)
+WHEEL_R, WHEEL_W, WHEEL_UP = 3.0, 10.0, 2.5   # thumb scroll roller: D6 x 10, crown 2.5 above the floor
 WELL_CLEAR = 3.5                # clearance around each digit's path to its button
 BUTTONS = HM.place_buttons(WRIST_Y, PALM_Z, TS, CAP_TOP)        # resting hand: Wheel, Repeat
 BUTTONS["Wheel"]["top"] = PALM_Z + WHEEL_UP
@@ -93,7 +97,7 @@ SYMBOL_RELIEF = "raised"        # "raised" (embossed, as in the pitch) or "etche
 # speaker strip at the rear: display (text rotated to face the speaker) + Reset
 DISPLAY = dict(x=-TS * -25.0, y=340.0, w=85.0, l=55.0, t=6.0, view_w=77.0, view_l=52.0)
 SPEAKER = {"Reset": dict(x=-TS * 45.0, y=340.0, r=10.0, symbol="reset")}
-POCKET_D, POCKET_CLEAR = 4.0, 2.5   # strip buttons sit in pockets, cap top 1 mm below the surface
+POCKET_D, POCKET_CLEAR = 3.0, 2.5   # strip buttons sit in pockets, cap top 1 mm below the surface
 
 
 def _pad(h, digit, back=3.0):
@@ -214,9 +218,9 @@ def shell():
     inner = rbox(BOX_W - 2 * WALL, BOX_L - 2 * WALL, PLATE_UNDER, CORNER_R - WALL,
                  -BOX_W / 2 + WALL, WALL, FLOOR)
     s = outer.cut(inner)
-    for i in range(7):                                           # rear vents
-        s = s.cut(Part.makeBox(6, 3 * WALL, 18, V(-60 + 20 * i, BOX_L - 2 * WALL, 12)))
-    s = s.cut(rod(5, (95, BOX_L - 2 * WALL, 22), (0, 1, 0), 3 * WALL))   # DC in
+    for i in range(9):                                           # rear vents (slots)
+        s = s.cut(Part.makeBox(10, 3 * WALL, 4, V(-75 + 18 * i, BOX_L - 2 * WALL, 6)))
+    s = s.cut(rbox(9.5, 3 * WALL, 3.6, 1.5, 90 - 4.75, BOX_L - 2 * WALL, 6))   # USB-C (12 V PD + data)
     return s
 
 
@@ -244,7 +248,7 @@ def hand_well():
             for i in range(3):
                 parts.append(_stadium(ppts[i], ppts[i + 1], max(pr[i], pr[i + 1]) + WELL_CLEAR, z0, h))
     for name, b in BUTTONS.items():                  # wheel bay also holds the + / - / || marks
-        parts.append(Part.makeCylinder(b["r"] + BUTTON_CLEAR + (9 if name == "Wheel" else 0), h,
+        parts.append(Part.makeCylinder(b["r"] + BUTTON_CLEAR + (12 if name == "Wheel" else 0), h,
                                        V(b["x"], b["y"], z0)))
     w = parts[0].multiFuse(parts[1:])
     return w.removeSplitter()
@@ -279,11 +283,13 @@ def top_plate():
     p = p.cut(Part.makeCylinder(6, depth + 1, V(0, PALM_Y - COVER / 2 - 1, PALM_Z - depth)))
     b = BUTTONS["Repeat"]                                                 # switch plunger hole
     p = p.cut(Part.makeCylinder(6.5, TOP_T + 2, V(b["x"], b["y"], PLATE_UNDER - 1)))
-    e = WHEEL_R - 2.0                                                     # wheel slot, >= 1 mm clearance
-    p = p.cut(_stadium(_wheel_pt(-e), _wheel_pt(e), WHEEL_W / 2 + 1,
+    # roller slot through the plate (roller crown 2.5 above the recess floor) + a pocket in the
+    # plate's underside for the axle cradle, press switch and magnetic angle sensor
+    p = p.cut(_stadium(_wheel_pt(-WHEEL_R - 0.8), _wheel_pt(WHEEL_R + 0.8), WHEEL_W / 2 + 0.8,
                        PLATE_UNDER - 1, TOP_T + 2))
-    p = p.cut(_stadium(_wheel_pt(0, 0), _wheel_pt(0, WHEEL_W / 2 + 16), 3.6, PLATE_UNDER - 1, BASE_T))  # axle
-    p = p.fuse(wheel_bezel_symbols()) if SYMBOL_RELIEF == "raised" else p.cut(wheel_bezel_symbols())
+    p = p.cut(_stadium(_wheel_pt(0, -WHEEL_W / 2 - 4), _wheel_pt(0, WHEEL_W / 2 + 6), 4.5,
+                       PLATE_UNDER - 1, 1 + BASE_T - 0.8))
+    p = p.cut(wheel_bezel_symbols())
     for b in list(STRIP.values()) + list(SPEAKER.values()):              # pocket + plunger hole
         p = p.cut(Part.makeCylinder(b["r"] + POCKET_CLEAR, POCKET_D + 1, V(b["x"], b["y"], BOX_H - POCKET_D)))
         p = p.cut(Part.makeCylinder(6.5, TOP_T + 2, V(b["x"], b["y"], PLATE_UNDER - 1)))
@@ -335,9 +341,12 @@ def braille_pins():
 
 
 def braille_parts():
+    """Pop-out Braille: per cell a block of 6 latching (bistable) pin actuators under the plate.
+    A short current pulse pushes a pin up 0.7 mm above the recess floor or pulls it flush; it
+    stays there without power. 7 mm tall, so it fits the 20 mm box."""
     mods, pins = None, None
     for name, (cx, cy) in BRAILLE_CELLS:
-        m = Part.makeBox(12, 44, 16, V(cx - 6, cy - 4, PLATE_UNDER - 16))   # body runs rearward
+        m = rbox(9, 12, 7.0, 1, cx - 4.5, cy - 6, PLATE_UNDER - 7.0)
         mods = m if mods is None else mods.fuse(m)
     for (x, y), up in braille_pins():
         top = PALM_Z + (0.7 if up else 0.0)
@@ -356,32 +365,34 @@ def _wheel_pt(along, side=0.0):
 
 
 def wheel_parts():
-    """Thumb scroll wheel (detented rotary encoder with push switch, mouse-wheel style):
-    roll AWAY from the palm = faster, roll IN = slower, press = pause / resume. Ribbed rim so
-    each detent is felt. Returns (wheel, encoder body)."""
+    """Thumb scroll roller (thin, like a slim mouse / keyboard roller): D6 x 10 knurled roller in
+    the plate, crown 2.5 mm above the recess floor. Roll AWAY from the palm = faster, IN = slower
+    (a magnet in the roller end + magnetic angle sensor, detent ribs), press = pause (the roller
+    cradle pivots onto a side switch). Returns (roller, sensor + switch)."""
     w = Part.makeCylinder(WHEEL_R, WHEEL_W, V(0, 0, -WHEEL_W / 2))
-    for k in range(20):                                    # ribs: shallow grooves across the rim
-        g = Part.makeBox(1.2, 1.4, WHEEL_W + 2, V(-0.6, WHEEL_R - 0.7, -WHEEL_W / 2 - 1))
-        g.rotate(V(0, 0, 0), V(0, 0, 1), k * 18)
+    for k in range(12):                                    # knurl ribs: felt as detents
+        g = Part.makeBox(0.8, 0.8, WHEEL_W + 2, V(-0.4, WHEEL_R - 0.4, -WHEEL_W / 2 - 1))
+        g.rotate(V(0, 0, 0), V(0, 0, 1), k * 30)
         w = w.cut(g)
-    w = w.fuse(Part.makeCylinder(3, WHEEL_W / 2 + 9, V(0, 0, 0)))          # axle to the encoder
+    w = w.fuse(Part.makeCylinder(1.0, WHEEL_W + 6, V(0, 0, -WHEEL_W / 2 - 3)))   # axle
     w.rotate(V(0, 0, 0), V(0, 1, 0), 90)                                   # axle along +x
     w.rotate(V(0, 0, 0), V(0, 0, 1), math.degrees(math.atan2(WHEEL_AX[1], WHEEL_AX[0])))
     w.translate(V(WHEEL["x"], WHEEL["y"], PALM_Z + WHEEL_UP - WHEEL_R))
-    ex, ey = _wheel_pt(0, WHEEL_W / 2 + 9 + 6)
-    enc = Part.makeBox(13, 13, 9, V(ex - 6.5, ey - 6.5, PLATE_UNDER - 10))
+    ex, ey = _wheel_pt(0, WHEEL_W / 2 + 3.5)
+    enc = Part.makeBox(5, 5, 2.5, V(ex - 2.5, ey - 2.5, PLATE_UNDER - 1.0))    # sensor + switch, under the recess floor
     return w.removeSplitter(), enc
 
 
 def wheel_bezel_symbols():
-    """Raised + (far end: roll away = faster), - (near end: roll in = slower) and || (beside the
-    wheel: press = pause) on the well floor around the wheel slot."""
+    """+ (far end: roll away = faster), - (near end: roll in = slower) and || (beside the roller:
+    press = pause), INCISED in the recess floor around the roller: the resting thumb lies over
+    them, so raised marks would press into it."""
     s = SYMBOL_SIZE["bezel"]
     out = None
     for kind, (a, b) in (("plus", (WHEEL_R + 6.5, 0)), ("minus", (-WHEEL_R - 6.5, 0)),
-                         ("pause", (0, -(WHEEL_W / 2 + 6)))):
+                         ("pause", (0, -(WHEEL_W / 2 + 5)))):
         x, y = _wheel_pt(a, b)
-        q = etch(kind, x, y, PALM_Z + ETCH_D, s, h=ETCH_D)
+        q = etch(kind, x, y, PALM_Z, s)              # incised: the thumb lies over them
         out = q if out is None else out.fuse(q)
     return out
 
@@ -392,15 +403,15 @@ def button_parts():
     Repeat: domed cap 0.5 mm above the well floor (the thumb wheel is built in wheel_parts()).
     Mode (free hand) and the speaker's Reset: flat caps in 4 mm pockets, top 1 mm below the
     surface, so the forearm or a resting hand cannot press them.
-    Every cap sits on a D12 stem to a low-profile 12x12 tactile switch under the plate."""
+    Every cap sits on a D10 stem to a 6x6 mm low-profile tactile switch under the plate."""
     caps, switches = [], None
     for name, b in BUTTONS.items():
         if name == "Wheel":
             continue
         x, y, r = b["x"], b["y"], b["r"]
         cap = Part.makeCylinder(r, CAP_TOP - PALM_Z - 0.5, V(x, y, PALM_Z + 0.5))
-        cap = cap.makeFillet(2.0, [e for e in cap.Edges if e.BoundBox.ZMin > CAP_TOP - 0.1])
-        cap = cap.fuse(Part.makeCylinder(6.0, BASE_T + 1.5, V(x, y, PLATE_UNDER - 1)))  # stem
+        cap = cap.makeFillet(1.0, [e for e in cap.Edges if e.BoundBox.ZMin > CAP_TOP - 0.1])
+        cap = cap.fuse(Part.makeCylinder(5.0, BASE_T + 0.6, V(x, y, PLATE_UNDER - 0.2)))  # stem
         cap = apply_symbol(cap, b["symbol"], x, y, CAP_TOP, SYMBOL_SIZE[name])
         caps.append((name, cap.removeSplitter()))
     for group, flip in ((STRIP, False), (SPEAKER, True)):
@@ -408,12 +419,12 @@ def button_parts():
             x, y, r = b["x"], b["y"], b["r"]
             top = BOX_H - 1.0
             cap = Part.makeCylinder(r, POCKET_D - 1.5, V(x, y, BOX_H - POCKET_D + 0.5))
-            cap = cap.makeFillet(1.0, [e for e in cap.Edges if e.BoundBox.ZMin > top - 0.1])
-            cap = cap.fuse(Part.makeCylinder(6.0, TOP_T - POCKET_D + 1.5, V(x, y, PLATE_UNDER - 1)))
+            cap = cap.makeFillet(0.6, [e for e in cap.Edges if e.BoundBox.ZMin > top - 0.1])
+            cap = cap.fuse(Part.makeCylinder(5.0, TOP_T - POCKET_D + 0.6, V(x, y, PLATE_UNDER - 0.2)))
             cap = apply_symbol(cap, b["symbol"], x, y, top, SYMBOL_SIZE[name], flip)
             caps.append((name, cap.removeSplitter()))
     for b in [BUTTONS["Repeat"]] + list(STRIP.values()) + list(SPEAKER.values()):
-        sw = Part.makeBox(16, 16, 9, V(b["x"] - 8, b["y"] - 8, PLATE_UNDER - 10))
+        sw = Part.makeBox(7, 7, 2.8, V(b["x"] - 3.5, b["y"] - 3.5, PLATE_UNDER - 3.2))   # 6x6 low-profile switch
         switches = sw if switches is None else switches.fuse(sw)
     return caps, switches
 
@@ -427,98 +438,56 @@ def display_part():
 
 
 def rails():
-    """Four rotating D8 perimeter shafts in 688ZZ bearing blocks. The y-shafts (left/right) are the
-    rails of the Y-bar and carry the x-belt pulleys; the x-shafts (front/back) are the rails of
-    the X-bar and carry the y-belt pulleys."""
+    """Two D5 Y-rods on supports from the base: the rails of the gantry (CoreXY)."""
     s = []
-    y0, y1 = PALM_Y - RAIL_DY - 12, PALM_Y + RAIL_DY + 10           # y-shafts span
     for sx in (-1, 1):
         x = sx * RAIL_X
-        end = y1 + (32 if sx == TS else 0)                          # X motor side: shaft extended
-        s.append(rod(SHAFT_R, (x, y0, Z_YRAIL), (0, 1, 0), end - y0))
-        for y in (y0 + 4, y1 - 4):
-            s.append(Part.makeBox(16, 8, Z_YRAIL + 10 - FLOOR, V(x - 8, y - 4, FLOOR)))
-    for sy in (-1, 1):
-        y = PALM_Y + sy * RAIL_DY
-        s.append(rod(SHAFT_R, (-BOX_W / 2 + WALL + 1, y, Z_XRAIL), (1, 0, 0), BOX_W - 2 * WALL - 2))
-        for x in (-120, 120):
-            s.append(Part.makeBox(8, 12, Z_XRAIL + 8 - FLOOR, V(x - 4, y - 6, FLOOR)))
-    out = s[0]
-    for q in s[1:]:
-        out = out.fuse(q)
-    return out.removeSplitter()
+        s.append(rod(ROD_R, (x, ROD_Y0 - 4, Z_YROD), (0, 1, 0), ROD_Y1 - ROD_Y0 + 8))
+        for y in (ROD_Y0, ROD_Y1):
+            s.append(Part.makeBox(10, 8, Z_YROD + 3 - FLOOR, V(x - 5, y - 4, FLOOR)))
+    return s[0].multiFuse(s[1:]).removeSplitter()
 
 
-XMOTOR = dict(x=TS * 88.0, y=PALM_Y + RAIL_DY + 37, z=FLOOR + NEMA14 / 2)     # shaft along y, -y
-YMOTOR = dict(x=-TS * 80.0, y=PALM_Y + RAIL_DY + 29, z=FLOOR + NEMA14 / 2)    # shaft along x
+def _belt_y(x, y0, y1, z):
+    return Part.makeBox(1.2, y1 - y0, BELT_W, V(x - 0.6, y0, z))
+
+
+def _belt_x(x0, x1, y, z):
+    return Part.makeBox(x1 - x0, 1.2, BELT_W, V(x0, y - 0.6, z))
 
 
 def drives():
-    """GT2 belts and 20T pulleys at shaft height (no drive layer below the rails), two NEMA14
-    with short belts to one y-shaft (X) and one x-shaft (Y)."""
+    """CoreXY drive, all flat. Belt A (lower layer) runs from the carriage to the gantry idlers,
+    along both sides to the rear, round motor A (rear left) and the rear-right idler. Belt B
+    (upper layer) runs from the carriage to the gantry idlers, along both sides to the front,
+    round motor B (front right) and the front-left idler. Motor A moves the pen along x + y,
+    motor B along x - y. The runs along y are static; the runs along x move with the gantry."""
     belts, metal, motors = [], [], []
-    yb0, yb1 = PALM_Y - RAIL_DY, PALM_Y + RAIL_DY                 # y-belts: around x-shaft pulleys
-    for sx in (-1, 1):
-        x = sx * belt_x(sx)
-        for y in (yb0, yb1):
-            metal.append(rod(FLANGE_R, (x - 4, y, Z_XRAIL), (1, 0, 0), 8))
-        for dz in (-PULLEY_R, PULLEY_R):
-            belts.append(Part.makeBox(6, yb1 - yb0, 1.5, V(x - 3, yb0, Z_XRAIL + dz - 0.75)))
-    xb = (PALM_Y - XBELT_DY, PALM_Y + XBELT_DY)                     # x-belts: around y-shaft pulleys
-    for y in xb:
-        for sx in (-1, 1):
-            metal.append(rod(FLANGE_R, (sx * RAIL_X, y - 4, Z_YRAIL), (0, 1, 0), 8))
-        for dz in (-PULLEY_R, PULLEY_R):
-            belts.append(Part.makeBox(2 * RAIL_X, 6, 1.5, V(-RAIL_X, y - 3, Z_YRAIL + dz - 0.75)))
-    # X motor: behind the rear bearing of one y-shaft, short belt in the x-z plane
-    m = XMOTOR
-    motors.append(Part.makeBox(NEMA14, 34, NEMA14, V(m["x"] - NEMA14 / 2, m["y"], m["z"] - NEMA14 / 2)))
-    py = m["y"] - 5
-    sx = TS * RAIL_X
-    metal.append(rod(2.5, (m["x"], py - 3, m["z"]), (0, 1, 0), 8))
-    metal.append(rod(PULLEY_R + 1, (m["x"], py - 3, m["z"]), (0, 1, 0), 6))
-    metal.append(rod(PULLEY_R + 1, (sx, py - 3, Z_YRAIL), (0, 1, 0), 6))
-    belts.append(_short_belt((m["x"], m["z"]), (sx, Z_YRAIL), py, "xz"))
-    # Y motor: behind the back x-shaft, short belt in the y-z plane
-    m = YMOTOR
-    motors.append(Part.makeBox(34, NEMA14, NEMA14, V(m["x"] - 17, m["y"] - NEMA14 / 2, m["z"] - NEMA14 / 2)))
-    px, face = m["x"] + TS * 22, m["x"] + TS * 17                  # pulley plane, inboard of the motor
-    metal.append(rod(2.5, (min(px, face) - 4, m["y"], m["z"]), (1, 0, 0), abs(px - face) + 8))
-    metal.append(rod(PULLEY_R + 1, (px - 3, m["y"], m["z"]), (1, 0, 0), 6))
-    metal.append(rod(PULLEY_R + 1, (px - 3, PALM_Y + RAIL_DY, Z_XRAIL), (1, 0, 0), 6))
-    belts.append(_short_belt((m["y"], m["z"]), (PALM_Y + RAIL_DY, Z_XRAIL), px, "yz"))
+    za, zb = BELT_A_Z, BELT_B_Z
+    ya0 = GC_MIN - IDLER_DY                      # foremost gantry idler A tangent point
+    yb1 = GC_MAX + IDLER_DY                      # rearmost gantry idler B tangent point
+    belts += [_belt_y(-BELT_X, ya0, MOTOR_A[1], za), _belt_y(BELT_X, ya0, IDLER_A[1], za),
+              _belt_x(MOTOR_A[0], IDLER_A[0], MOTOR_A[1] + RING_R, za)]
+    belts += [_belt_y(BELT_X, MOTOR_B[1], yb1, zb), _belt_y(-BELT_X, IDLER_B[1], yb1, zb),
+              _belt_x(IDLER_B[0], MOTOR_B[0], MOTOR_B[1] - RING_R, zb)]
+    for (x, y), z in ((IDLER_A, za), (IDLER_B, zb)):            # corner idlers on posts
+        metal.append(Part.makeCylinder(IDLER_R, BELT_W, V(x, y, z)))
+        metal.append(Part.makeCylinder(1.5, z - FLOOR, V(x, y, FLOOR)))
+    for (x, y), z in ((MOTOR_A, za), (MOTOR_B, zb)):            # flat gimbal motors + ring pulleys
+        motors.append(Part.makeCylinder(MOTOR_R, MOTOR_H, V(x, y, FLOOR)))
+        metal.append(Part.makeCylinder(RING_R + 0.6, BELT_W, V(x, y, z)))
     f = lambda L: L[0].multiFuse(L[1:]).removeSplitter() if len(L) > 1 else L[0]
     return f(belts), f(metal), f(motors)
 
 
-def _short_belt(a, b, plane_pos, plane):
-    """Two straight runs (tangent lines) of a short belt between equal pulleys a and b."""
-    (u0, v0), (u1, v1) = a, b
-    L = math.hypot(u1 - u0, v1 - v0)
-    nu, nv = -(v1 - v0) / L, (u1 - u0) / L
-    out = None
-    for sgn in (-1, 1):
-        p0 = (u0 + sgn * nu * PULLEY_R, v0 + sgn * nv * PULLEY_R)
-        d = (u1 - u0, v1 - v0)
-        if plane == "xz":
-            seg = Part.makeBox(L, 6, 1.4, V(0, -3, -0.7))
-            seg.rotate(V(0, 0, 0), V(0, 1, 0), -math.degrees(math.atan2(d[1], d[0])))
-            seg.translate(V(p0[0], plane_pos, p0[1]))
-        else:
-            seg = Part.makeBox(6, L, 1.4, V(-3, 0, -0.7))
-            seg.rotate(V(0, 0, 0), V(1, 0, 0), math.degrees(math.atan2(d[1], d[0])))
-            seg.translate(V(plane_pos, p0[0], p0[1]))
-        out = seg if out is None else out.fuse(seg)
-    return out
-
-
 def electronics():
-    sbc = Part.makeBox(85, 56, 17, V(-TS * 52.5 - 42.5, 3.5, FLOOR + 3))   # Raspberry Pi 5
-    ctl = Part.makeBox(62, 50, 15, V(TS * 69 - 31, 4, FLOOR + 3))           # GRBL controller + 2x TMC2209
-    brl = Part.makeBox(55, 45, 14, V(TS * 2.5 - 27.5, 305, FLOOR + 1))      # Braille HV driver
-    mic = Part.makeBox(24, 24, 4, V(-TS * 80 - 4.5, 324, PLATE_UNDER - 4))
-    pico = Part.makeBox(51, 21, 6, V(-TS * 40 - 25.5, 352, FLOOR + 3))     # Pico: buttons + display link
-    return sbc, ctl, brl, mic, pico
+    """Everything flat. Controller board: Pico + 2 BLDC drivers (DRV8313) + pen MOSFET +
+    Braille pulse drivers. Phase 2: Raspberry Pi CM5 on a flat carrier (a Pi 5 is too tall)."""
+    sbc = Part.makeBox(70, 46, 6, V(-TS * 60 - 35, 4, FLOOR + 0.5))        # CM5 carrier (phase 2)
+    ctl = Part.makeBox(70, 46, 6, V(TS * 60 - 35, 4, FLOOR + 0.5))         # controller board
+    brl = Part.makeBox(40, 24, 4, V(TS * 2.5 - 20, 300, FLOOR + 0.5))      # Braille pulse drivers
+    mic = Part.makeBox(16, 16, 3, V(-TS * 80 - 2.5, 330, PLATE_UNDER - 3.2))
+    return sbc, ctl, brl, mic
 
 
 def forearm_pad():
@@ -570,53 +539,51 @@ def hand_dummy():
 
 
 # ---------------- moving parts (built at palm offset 0,0 / pen up) ----------------
-def ybar():
-    """D6 bar along x that moves in y. Its end blocks slide (bronze bushing) on the rotating
-    y-shafts; a tab on each block clamps the lower run of that side's y-belt."""
+def gantry():
+    """Moves in y. Two Y-blocks slide on the Y-rods (bushings); a bridge over the belt runs holds
+    the twin D5 X-rods and, hanging below it, the gantry idlers of belt A (front) and belt B
+    (rear). The belt runs along x (carriage to idlers) move with it. Built at gantry y = PALM_Y."""
     yc = PALM_Y
-    s = rod(BAR_R, (-RAIL_X + 7, yc, Z_YBAR), (1, 0, 0), 2 * RAIL_X - 14)
+    parts = []
     for sx in (-1, 1):
         x = sx * RAIL_X
-        b = Part.makeBox(18, 22, 16, V(x - 9, yc - 11, Z_YRAIL - 8))
-        b = b.cut(rod(BORE_SHAFT, (x, yc - 12, Z_YRAIL), (0, 1, 0), 24))
-        zb = Z_XRAIL - PULLEY_R                                # lower run of the y-belt
-        x0, x1 = sorted((x - sx * 9, sx * (belt_x(sx) - 4)))
-        tab = Part.makeBox(x1 - x0, 10, zb + 1.2 - (Z_YRAIL + 6), V(x0, yc - 5, Z_YRAIL + 6))
-        s = s.fuse(b).fuse(tab)
-    return s.removeSplitter()
+        b = Part.makeBox(15, 28, 10.5, V(x - 7.5, yc - 14, FLOOR + 0.5))
+        b = b.cut(rod(BORE, (x, yc - 15, Z_YROD), (0, 1, 0), 30))
+        bx0, bx1 = sorted((sx * (BELT_X - 12), sx * (RAIL_X - 7.5)))
+        bridge = Part.makeBox(bx1 - bx0, 40, 4.0, V(bx0, yc - 20, 9.5))     # over the belt runs
+        parts += [b, bridge]
+        for dy, z in ((-IDLER_DY, BELT_A_Z), (IDLER_DY, BELT_B_Z)):
+            ix = sx * (BELT_X - IDLER_R)
+            parts.append(Part.makeCylinder(IDLER_R, BELT_W, V(ix, yc + dy, z)))
+            parts.append(Part.makeCylinder(1.5, 9.5 - z - BELT_W, V(ix, yc + dy, z + BELT_W)))
+    for dy in (-XROD_DY, XROD_DY):
+        parts.append(rod(ROD_R, (-(BELT_X - 3), yc + dy, Z_XROD), (1, 0, 0), 2 * (BELT_X - 3)))
+    return parts[0].multiFuse(parts[1:]).removeSplitter()
 
 
-def xbar():
-    """D6 bar along y that moves in x. End blocks slide on the rotating x-shafts; a tab on each
-    block reaches down to clamp the upper run of that side's x-belt."""
-    xc = 0.0
-    s = rod(BAR_R, (xc, PALM_Y - RAIL_DY + 5, Z_XBAR), (0, 1, 0), 2 * RAIL_DY - 10)
-    for sy in (-1, 1):
-        y = PALM_Y + sy * RAIL_DY
-        b = Part.makeBox(18, 14, 16, V(xc - 9, y - 7, Z_XRAIL - 8))
-        b = b.cut(rod(BORE_SHAFT, (xc - 10, y, Z_XRAIL), (1, 0, 0), 20))
-        zt = Z_YRAIL + PULLEY_R                                # upper run of the x-belt
-        yb = PALM_Y + sy * XBELT_DY
-        y0, y1 = sorted((y - sy * 7, yb + sy * 4))
-        tab = Part.makeBox(10, y1 - y0, Z_XRAIL - 8 - (zt - 1.2), V(xc - 5, y0, zt - 1.2))
-        s = s.fuse(b).fuse(tab)
-    return s.removeSplitter()
+def gantry_belts():
+    """Belt runs along x (moving with the gantry): A in front of the carriage, B behind it."""
+    yc, xi = PALM_Y, BELT_X - IDLER_R
+    a = _belt_x(-xi, xi, yc - IDLER_DY - IDLER_R, BELT_A_Z)
+    b = _belt_x(-xi, xi, yc + IDLER_DY + IDLER_R, BELT_B_Z)
+    return a.fuse(b)
 
 
 def carriage():
-    """Cross block on both bars + pen head: a vertical pen sleeve at (PEN_DX, PEN_DY) and a
-    12 V frame solenoid lying flat along x that pushes a 35 deg wedge under the pen's roller
-    (10 mm plunger travel -> 7 mm lift). Lying flat keeps the head 23 mm tall instead of 45."""
+    """Slides on the twin X-rods (bushings). Clamps belt A (front lug, lower layer) and belt B
+    (rear lug, upper layer). Pen head: a vertical pen sleeve at the centre and a mini frame
+    solenoid lying flat along x that pushes a wedge under the pen (5 mm lift). 7 mm tall."""
     cx, cy = 0.0, PALM_Y
-    c = rbox(24, 24, Z_XBAR + 6 - (Z_YBAR - 6), 3, cx - 12, cy - 12, Z_YBAR - 6)
-    c = c.cut(rod(BORE_BAR, (cx - 14, cy, Z_YBAR), (1, 0, 0), 28))
-    c = c.cut(rod(BORE_BAR, (cx, cy - 14, Z_XBAR), (0, 1, 0), 28))
-    px, py = PEN_DX, PALM_Y + PEN_DY
-    sleeve = Part.makeCylinder(4.5, PEN_UP_TIP - 5.5 - (Z_YBAR - 6), V(px, py, Z_YBAR - 6))
-    arm = Part.makeBox(14, 14, 4, V(cx + 6, cy + 6, Z_YBAR - 6))
-    sol = rbox(30, 14, 16, 2, px + 6, py - 7, Z_YBAR - 6)            # frame solenoid body
-    wedge = Part.makeBox(6, 8, 6, V(px + 1, py - 4, Z_YBAR - 2))       # plunger + wedge
-    return c.fuse([sleeve, arm, sol, wedge]).removeSplitter()
+    c = rbox(24, 20, PLATE_UNDER - 1.0 - 7.0, 2, cx - 12, cy - 10, 7.0)
+    for dy in (-XROD_DY, XROD_DY):
+        c = c.cut(rod(BORE, (cx - 13, cy + dy, Z_XROD), (1, 0, 0), 26))
+    yA, yB = IDLER_DY + IDLER_R, IDLER_DY + IDLER_R
+    lug_a = Part.makeBox(8, yA - 9, 7.0 - BELT_A_Z + 0.2, V(cx - 4, cy - yA - 1, BELT_A_Z - 0.2))
+    lug_b = Part.makeBox(8, yB - 9, 7.0 - BELT_B_Z + 0.2, V(cx - 4, cy + 10, BELT_B_Z - 0.2))
+    sleeve = Part.makeCylinder(3.0, 7.0 - 4.0 + 2, V(cx, cy, 4.0))
+    sol = rbox(16, 7, 6.0, 1, cx + 12, cy - 3.5, 7.5)                # mini frame solenoid
+    wedge = Part.makeBox(9, 5, 2.5, V(cx + 3, cy - 2.5, 4.5))       # plunger + wedge under the pen
+    return c.fuse([lug_a, lug_b, sleeve, sol, wedge]).removeSplitter()
 
 
 def pen():
@@ -624,7 +591,7 @@ def pen():
     the force on the palm. Built in the pen-up position."""
     tip = PEN_UP_TIP
     x, y = PEN_DX, PALM_Y + PEN_DY
-    shaft = Part.makeCylinder(1.5, 16, V(x, y, tip - 20))
+    shaft = Part.makeCylinder(1.5, 7.0, V(x, y, tip - 10.6))
     cone = Part.makeCone(1.5, 0.5, 3.6, V(x, y, tip - 4))
     ball = Part.makeSphere(0.5, V(x, y, tip - 0.5))
     return shaft.fuse(cone).fuse(ball).removeSplitter()
@@ -646,7 +613,7 @@ def add(name, shape, col, alpha=0):
 
 
 belts, metal, motors = drives()
-sbc, ctl, brl, mic, pico = electronics()
+sbc, ctl, brl, mic = electronics()
 cover_frame, cover_membrane = cover_parts()
 mods, pins = braille_parts()
 caps, switches = button_parts()
@@ -655,19 +622,18 @@ caps.insert(0, ("Wheel", wheel))
 switches = switches.fuse(encoder)
 hand, arm = hand_dummy()
 S = {
-    "Shell": add("Shell", shell(), (0.93, 0.93, 0.91), 0),
-    "TopPlate": add("TopPlate", top_plate(), (0.78, 0.86, 0.92), 55),
-    "ForearmPad": add("ForearmPad", forearm_pad(), (0.36, 0.40, 0.46), 0),
-    "WristPad": add("WristPad", wrist_pad(), (0.80, 0.55, 0.15), 0),
+    "Shell": add("Shell", shell(), (0.10, 0.10, 0.11), 0),               # matte black
+    "TopPlate": add("TopPlate", top_plate(), (0.14, 0.14, 0.15), 0),     # soft-touch black
+    "ForearmPad": add("ForearmPad", forearm_pad(), (0.20, 0.20, 0.22), 0),
+    "WristPad": add("WristPad", wrist_pad(), (0.95, 0.55, 0.12), 0),      # one warm accent
     "Rails": add("Rails", rails(), (0.72, 0.74, 0.76), 0),
     "Belts": add("Belts", belts, (0.12, 0.12, 0.12), 0),
     "Pulleys": add("Pulleys", metal, (0.60, 0.62, 0.64), 0),
-    "Steppers": add("Steppers", motors, (0.18, 0.18, 0.2), 0),
+    "Motors": add("Motors", motors, (0.18, 0.18, 0.2), 0),
     "SBC": add("SBC", sbc, (0.10, 0.55, 0.25), 0),
     "Controller": add("Controller", ctl, (0.15, 0.25, 0.65), 0),
     "BrailleDriver": add("BrailleDriver", brl, (0.55, 0.15, 0.55), 0),
     "Mic": add("Mic", mic, (0.10, 0.45, 0.20), 0),
-    "Pico": add("Pico", pico, (0.10, 0.45, 0.20), 0),
     "SpeakerDisplay": add("SpeakerDisplay", display_part(), (0.08, 0.10, 0.14), 0),
     "CoverFrame": add("CoverFrame", cover_frame, (0.25, 0.27, 0.30), 0),
     "CoverMembrane": add("CoverMembrane", cover_membrane, (0.55, 0.75, 0.85), 50),
@@ -677,14 +643,14 @@ S = {
     "HandDummy": add("HandDummy", hand, (0.95, 0.78, 0.66), 40),
     "ForearmDummy": add("ForearmDummy", arm, (0.95, 0.78, 0.66), 40),
 }
-CAP_COL = {"Wheel": (0.15, 0.45, 0.75), "Repeat": (0.90, 0.35, 0.10), "Mode": (0.20, 0.60, 0.45),
-           "Reset": (0.80, 0.12, 0.12)}
+CAP_COL = {"Wheel": (0.86, 0.86, 0.84), "Repeat": (0.86, 0.86, 0.84), "Mode": (0.86, 0.86, 0.84),
+           "Reset": (0.85, 0.16, 0.13)}     # light caps on the black top: visible to helpers; Reset red
 for name, cap in caps:
     S["Button" + name] = add("Button" + name, cap, CAP_COL[name], 0)
 
 M = {
-    "YBar": add("YBar", ybar(), (0.29, 0.47, 0.66), 0),
-    "XBar": add("XBar", xbar(), (0.95, 0.52, 0.10), 0),
+    "Gantry": add("Gantry", gantry(), (0.29, 0.47, 0.66), 0),
+    "GantryBelts": add("GantryBelts", gantry_belts(), (0.12, 0.12, 0.12), 0),
     "Carriage": add("Carriage", carriage(), (0.30, 0.30, 0.32), 0),
     "Pen": add("Pen", pen(), (0.75, 0.15, 0.15), 0),
 }
@@ -696,7 +662,7 @@ def offsets(px, py, down):
     mx = -px            # writing from below a palm-down hand: mirror so letters feel upright
     cx, cy = mx - PEN_DX, py - PEN_DY                        # carriage centre
     dz = PEN_STROKE * down
-    return {"YBar": (0, cy, 0), "XBar": (cx, 0, 0), "Carriage": (cx, cy, 0), "Pen": (cx, cy, dz)}
+    return {"Gantry": (0, cy, 0), "GantryBelts": (0, cy, 0), "Carriage": (cx, cy, 0), "Pen": (cx, cy, dz)}
 
 
 def set_pose(px, py, down):
@@ -720,7 +686,11 @@ def overlap(a, b):
     return a.common(b).Volume
 
 
-INTENDED = {("Belts", "YBar"), ("Belts", "XBar"),           # belt clamps
+INTENDED = {("Belts", "Gantry"), ("Pulleys", "GantryBelts"),  # belts run onto the gantry idlers
+            ("Belts", "GantryBelts"), ("GantryBelts", "Gantry"), ("GantryBelts", "Carriage"),
+            ("Carriage", "GantryBelts"), ("Gantry", "GantryBelts"), ("Gantry", "Belts"),
+            ("Rails", "Gantry"),                           # Y-rods run through the Y-block bushings
+            ("Gantry", "Carriage"), ("Carriage", "Gantry"),  # X-rods run through the carriage bushings
             ("CoverMembrane", "Pen"),
             ("Pen", "Carriage"),                            # pen runs inside its sleeve
             ("Pen", "CoverMembrane")}                       # pen pushes the membrane into the palm
@@ -750,8 +720,8 @@ def run_checks():
     for i, a in enumerate(names):
         for b in names[i + 1:]:
             if {a, b} in ({"BrailleCells", "BraillePins"}, {"TopPlate", "BraillePins"},
-                          {"Pulleys", "Steppers"}, {"Pulleys", "Belts"}, {"Pulleys", "Rails"},
-                          {"ButtonWheel", "ButtonSwitches"}):        # wheel axle in its encoder
+                          {"Pulleys", "Motors"}, {"Pulleys", "Belts"}, {"Belts", "Motors"},
+                          {"ButtonWheel", "ButtonSwitches"}, {"ButtonWheel", "TopPlate"}):  # roller axle in its cradle
                 continue
             v = overlap(S[a].Shape, S[b].Shape)
             if v > 1e-3:
@@ -788,12 +758,12 @@ def run_checks():
     for k, v in sorted(res.items(), key=lambda kv: str(kv[0])):
         if isinstance(k, str):
             print("  %-44s %10.2f mm" % (k, v))
-        elif v > 1e-3 or k in (("Pen", "TopPlate"), ("Carriage", "TopPlate"), ("YBar", "XBar"),
+        elif v > 1e-3 or k in (("Pen", "TopPlate"), ("Carriage", "TopPlate"), ("Gantry", "TopPlate"),
                                ("Carriage", "hand")):
             rep("%s vs %s" % k, v)
     print("  (%d moving pairs checked)" % len([k for k in res if not isinstance(k, str)]))
     set_pose(0, 0, 0)
-    print("Box: %.0f W x %.0f L x %.0f H mm; hand well %.0f mm deep, palm at z=%.0f; forearm pad %.0f mm high" %
+    print("Box: %.0f W x %.0f L x %.0f H mm; glove recess %.1f mm deep, palm at z=%.1f; forearm pad %.1f mm high" %
           (BOX_W, BOX_L, BOX_H, RECESS, PALM_Z, PALM_Z))
     for name, b in BUTTONS.items():
         print("  control %-6s at (%6.1f, %6.1f), %s '%s', used by the %s" % (
@@ -826,20 +796,23 @@ def hand_checks():
         ok &= clash < 1e-3
         for pose in ["rest"] + list(BUTTONS):
             hs, info = hand_solid(size, pose)
-            clash, pressed = 0.0, None
+            clash, pressed, hit = 0.0, None, []
             for k in keys:
                 v = overlap(hs, S[k].Shape)
                 if pose != "rest" and k == "Button" + pose:
                     pressed = v
                     continue
                 clash += v
+                if v > 1e-3:
+                    hit.append("%s %.2f" % (k, v))
             digit, swing, short = info if info else ("", 0.0, 0.0)
             good = clash < 1e-3 and short <= 0.5 and (pressed is None or pressed > 0)
             ok &= good
             print("  %-7s %-7s %-7s %6.0f° %10.1f %12.3f  %s" % (
                 size, pose, digit, swing, short, clash,
                 ("ok" if good else "FAIL") + ("" if pressed is None else
-                                              ("  (presses)" if pressed > 0 else "  (misses)"))))
+                                              ("  (presses)" if pressed > 0 else "  (misses)")) +
+                ("  touches: " + ", ".join(hit) if hit else "")))
         pc = h.palm_centre
         print("  %-7s palm centre (%.0f, %.0f): %.1f mm from the writing centre; index/middle pad "
               "to Braille cell: %.1f / %.1f mm" % (
@@ -870,9 +843,12 @@ def dump(path):
                            buttons={k: [b["x"], b["y"]] for k, b in
                                     list(BUTTONS.items()) + list(STRIP.items()) + list(SPEAKER.items())},
                            strip=STRIP, speaker=SPEAKER, display=DISPLAY, symbol_size=SYMBOL_SIZE,
-                           COVER=COVER, COVER_T=COVER_T, Z_YRAIL=Z_YRAIL, Z_XRAIL=Z_XRAIL,
-                           Z_YBAR=Z_YBAR, Z_XBAR=Z_XBAR, PEN_UP_TIP=PEN_UP_TIP, CAP_TOP=CAP_TOP,
-                           XMOTOR=XMOTOR, YMOTOR=YMOTOR,
+                           COVER=COVER, COVER_T=COVER_T, Z_YROD=Z_YROD, Z_XROD=Z_XROD,
+                           BELT_A_Z=BELT_A_Z, BELT_B_Z=BELT_B_Z, BELT_W=BELT_W, RAIL_X=RAIL_X,
+                           BELT_X=BELT_X, XROD_DY=XROD_DY, IDLER_DY=IDLER_DY,
+                           PEN_UP_TIP=PEN_UP_TIP, CAP_TOP=CAP_TOP, FLOOR=FLOOR,
+                           MOTOR_A=MOTOR_A, MOTOR_B=MOTOR_B, MOTOR_R=MOTOR_R, MOTOR_H=MOTOR_H,
+                           WHEEL_R=WHEEL_R,
                            button_r={k: b.get("r", b.get("w", 0) / 2) for k, b in BUTTONS.items()},
                            button_spec=BUTTONS, wrist_pad=WRIST_PAD,
                            RECESS=RECESS, BASE_T=BASE_T, TOP_T=TOP_T,

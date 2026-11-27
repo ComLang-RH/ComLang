@@ -11,7 +11,7 @@ Headless:  freecadcmd haptic_box.FCMacro   (clearance checks + saves haptic_box.
 
 Frame: x across the box (+x = user's right), y into the box from the inside face
 of the front wall, z up from the inner floor. Units mm.
-Needs palm_writer.py in the same folder (kinematics + stroke font).
+Needs demos/palm_writer.py (kinematics + stroke font).
 """
 import math, os, sys, time
 import FreeCAD as App
@@ -45,6 +45,7 @@ try:
 except NameError:
     HERE = os.getcwd()
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, "demos"))  # v0.1 5-bar kinematics live in the demo
 import palm_writer as pw  # noqa: E402
 
 SIDE = 1.0 if HAND == "right" else -1.0

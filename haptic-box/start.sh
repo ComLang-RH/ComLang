@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch the Haptic Palm Writer app with the live 3D simulation of the CAD model.
+# Launch the ComLang DEMO app with the live 3D simulation of the CAD model.
 #   ./start.sh            (from anywhere)
 set -e
 cd "$(dirname "$(readlink -f "$0")")"
@@ -13,6 +13,7 @@ if ! .venv/bin/python -c "import numpy, vosk, sounddevice" 2>/dev/null; then
   .venv/bin/pip install --quiet numpy vosk sounddevice pyserial
 fi
 
+# The demo builds the simulated controller firmware itself (needs cmake + a C compiler).
 # (Re)build the CAD meshes when missing or when the CAD macro changed.
 if [ ! -f build/v2_mesh.json ] || [ haptic_box_v2.FCMacro -nt build/v2_mesh.json ] || [ hand_model.py -nt build/v2_mesh.json ]; then
   if command -v freecadcmd >/dev/null; then
@@ -23,4 +24,4 @@ if [ ! -f build/v2_mesh.json ] || [ haptic_box_v2.FCMacro -nt build/v2_mesh.json
   fi
 fi
 
-exec .venv/bin/python haptic_app.py "$@"
+exec .venv/bin/python demos/haptic_app.py "$@"
